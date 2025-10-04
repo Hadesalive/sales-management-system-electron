@@ -3,16 +3,22 @@
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '../core/button';
-import { Input } from '../forms/input';
 import { Select } from '../forms/select';
 import { Switch } from '../forms/switch';
 import { 
   SwatchIcon, 
-  EyeIcon, 
-  DocumentIcon,
   CheckIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
+
+// Import preview components
+import {
+  ProCorporatePreview,
+  ModernStripePreview,
+  MinimalOutlinePreview,
+  ElegantDarkPreview,
+  ClassicColumnPreview
+} from './templates';
 
 export interface InvoiceTemplate {
   id: string;
@@ -40,103 +46,50 @@ export interface InvoiceTemplate {
   };
 }
 
-const defaultTemplates: InvoiceTemplate[] = [
-  {
-    id: 'classic',
-    name: 'Classic',
-    description: 'Traditional business invoice design',
-    preview: 'classic-preview',
-    colors: {
-      primary: '#2563eb',
-      secondary: '#64748b',
-      accent: '#059669',
-      background: '#ffffff',
-      text: '#1f2937'
-    },
-    layout: {
-      headerStyle: 'classic',
-      showLogo: true,
-      showBorder: true,
-      itemTableStyle: 'detailed',
-      footerStyle: 'detailed'
-    },
-    fonts: {
-      primary: 'Inter',
-      secondary: 'Inter',
-      size: 'medium'
-    }
-  },
-  {
-    id: 'modern',
-    name: 'Modern',
-    description: 'Clean and contemporary design',
-    preview: 'modern-preview',
-    colors: {
-      primary: '#7c3aed',
-      secondary: '#6b7280',
-      accent: '#dc2626',
-      background: '#ffffff',
-      text: '#111827'
-    },
-    layout: {
-      headerStyle: 'modern',
-      showLogo: true,
-      showBorder: false,
-      itemTableStyle: 'modern',
-      footerStyle: 'minimal'
-    },
-    fonts: {
-      primary: 'Inter',
-      secondary: 'Inter',
-      size: 'medium'
-    }
-  },
-  {
-    id: 'minimal',
-    name: 'Minimal',
-    description: 'Simple and clean design',
-    preview: 'minimal-preview',
-    colors: {
-      primary: '#374151',
-      secondary: '#9ca3af',
-      accent: '#059669',
-      background: '#ffffff',
-      text: '#111827'
-    },
-    layout: {
-      headerStyle: 'minimal',
-      showLogo: false,
-      showBorder: false,
-      itemTableStyle: 'simple',
-      footerStyle: 'minimal'
-    },
-    fonts: {
-      primary: 'Inter',
-      secondary: 'Inter',
-      size: 'small'
-    }
-  }
-];
+import { allTemplates } from './templates';
+
+const defaultTemplates: InvoiceTemplate[] = allTemplates;
+
+// Preview component mapping
+const previewComponents = {
+  'pro-corporate': ProCorporatePreview,
+  'modern-stripe': ModernStripePreview,
+  'minimal-outline': MinimalOutlinePreview,
+  'elegant-dark': ElegantDarkPreview,
+  'classic-column': ClassicColumnPreview
+};
+
+const getPreviewComponent = (templateId: string) => {
+  return previewComponents[templateId as keyof typeof previewComponents] || ProCorporatePreview;
+};
 
 interface InvoiceTemplatesProps {
-  selectedTemplate: string;
-  onTemplateSelect: (templateId: string) => void;
-  onCustomize: (template: InvoiceTemplate) => void;
+  selectedTemplate?: string;
+  onTemplateSelect?: (templateId: string) => void;
+  onCustomize?: (template: InvoiceTemplate) => void;
+  onTemplateUpdate?: (template: InvoiceTemplate) => void;
+  currentInvoiceData?: unknown;
   className?: string;
 }
 
 export function InvoiceTemplates({ 
-  selectedTemplate, 
+  selectedTemplate = 'corporate', 
   onTemplateSelect, 
   onCustomize,
+  onTemplateUpdate,
   className = "" 
 }: InvoiceTemplatesProps) {
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [customTemplate, setCustomTemplate] = useState<InvoiceTemplate>(defaultTemplates[0]);
 
   const handleTemplateSelect = (templateId: string) => {
-    onTemplateSelect(templateId);
-    setCustomTemplate(defaultTemplates.find(t => t.id === templateId) || defaultTemplates[0]);
+    onTemplateSelect?.(templateId);
+    const selectedTemplateData = defaultTemplates.find(t => t.id === templateId) || defaultTemplates[0];
+    setCustomTemplate(selectedTemplateData);
+    // Trigger live preview update
+    if (onTemplateUpdate) {
+      onTemplateUpdate(selectedTemplateData);
+    }
   };
 
   const handleCustomize = () => {
@@ -144,7 +97,10 @@ export function InvoiceTemplates({
   };
 
   const handleSaveCustomization = () => {
-    onCustomize(customTemplate);
+    onCustomize?.(customTemplate);
+    if (onTemplateUpdate) {
+      onTemplateUpdate(customTemplate);
+    }
     setShowCustomizer(false);
   };
 
@@ -152,41 +108,55 @@ export function InvoiceTemplates({
     setShowCustomizer(false);
   };
 
-  const updateTemplateField = (field: string, value: any) => {
-    setCustomTemplate(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
   const updateColors = (colorField: string, value: string) => {
-    setCustomTemplate(prev => ({
-      ...prev,
-      colors: {
-        ...prev.colors,
-        [colorField]: value
+    setCustomTemplate(prev => {
+      const updated = {
+        ...prev,
+        colors: {
+          ...prev.colors,
+          [colorField]: value
+        }
+      };
+      // Trigger live preview update
+      if (onTemplateUpdate) {
+        onTemplateUpdate(updated);
       }
-    }));
+      return updated;
+    });
   };
 
-  const updateLayout = (field: string, value: any) => {
-    setCustomTemplate(prev => ({
-      ...prev,
-      layout: {
-        ...prev.layout,
-        [field]: value
+  const updateLayout = (field: string, value: string | boolean) => {
+    setCustomTemplate(prev => {
+      const updated = {
+        ...prev,
+        layout: {
+          ...prev.layout,
+          [field]: value
+        }
+      };
+      // Trigger live preview update
+      if (onTemplateUpdate) {
+        onTemplateUpdate(updated);
       }
-    }));
+      return updated;
+    });
   };
 
-  const updateFonts = (field: string, value: any) => {
-    setCustomTemplate(prev => ({
-      ...prev,
-      fonts: {
-        ...prev.fonts,
-        [field]: value
+  const updateFonts = (field: string, value: string) => {
+    setCustomTemplate(prev => {
+      const updated = {
+        ...prev,
+        fonts: {
+          ...prev.fonts,
+          [field]: value
+        }
+      };
+      // Trigger live preview update
+      if (onTemplateUpdate) {
+        onTemplateUpdate(updated);
       }
-    }));
+      return updated;
+    });
   };
 
   return (
@@ -196,59 +166,61 @@ export function InvoiceTemplates({
         <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
           Choose Template
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {defaultTemplates.map((template) => (
             <div
               key={template.id}
               className={cn(
-                "relative p-4 border-2 rounded-lg cursor-pointer transition-all",
+                "relative p-6 border-2 rounded-xl cursor-pointer transition-all hover:shadow-lg",
                 selectedTemplate === template.id
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-lg"
                   : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
               )}
               onClick={() => handleTemplateSelect(template.id)}
             >
               {selectedTemplate === template.id && (
-                <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                  <CheckIcon className="h-4 w-4 text-white" />
+                <div className="absolute top-3 right-3 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                  <CheckIcon className="h-5 w-5 text-white" />
                 </div>
               )}
               
-              <div className="space-y-2">
-                <h4 className="font-medium" style={{ color: 'var(--foreground)' }}>
-                  {template.name}
-                </h4>
-                <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                  {template.description}
-                </p>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>
+                    {template.name}
+                  </h4>
+                  <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    {template.description}
+                  </p>
+                </div>
                 
-                {/* Template Preview */}
-                <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded border">
-                  <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                    Preview
+                {/* Real Template Preview */}
+                <div className="mt-4">
+                  <div className="w-full h-32 bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
+                    {(() => {
+                      const PreviewComponent = getPreviewComponent(template.id);
+                      return <PreviewComponent />;
+                    })()}
                   </div>
+                </div>
+
+                {/* Color Palette */}
+                <div className="flex gap-2">
                   <div 
-                    className="h-16 rounded border"
-                    style={{ 
-                      backgroundColor: template.colors.background,
-                      borderColor: template.colors.primary 
-                    }}
-                  >
-                    <div className="p-2 space-y-1">
-                      <div 
-                        className="h-2 rounded"
-                        style={{ backgroundColor: template.colors.primary, width: '60%' }}
-                      />
-                      <div 
-                        className="h-1 rounded"
-                        style={{ backgroundColor: template.colors.secondary, width: '40%' }}
-                      />
-                      <div 
-                        className="h-1 rounded"
-                        style={{ backgroundColor: template.colors.accent, width: '30%' }}
-                      />
-                    </div>
-                  </div>
+                    className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                    style={{ backgroundColor: template.colors.primary }}
+                    title="Primary Color"
+                  />
+                  <div 
+                    className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                    style={{ backgroundColor: template.colors.secondary }}
+                    title="Secondary Color"
+                  />
+                  <div 
+                    className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                    style={{ backgroundColor: template.colors.accent }}
+                    title="Accent Color"
+                  />
                 </div>
               </div>
             </div>
@@ -292,52 +264,72 @@ export function InvoiceTemplates({
               {/* Colors Section */}
               <div>
                 <h3 className="text-lg font-medium mb-4" style={{ color: 'var(--foreground)' }}>
-                  Colors
+                  Brand Colors
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                       Primary Color
                     </label>
-                    <input
-                      type="color"
-                      value={customTemplate.colors.primary}
-                      onChange={(e) => updateColors('primary', e.target.value)}
-                      className="w-full h-10 border rounded"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="color"
+                        value={customTemplate.colors.primary}
+                        onChange={(e) => updateColors('primary', e.target.value)}
+                        className="w-full h-12 border rounded-lg cursor-pointer"
+                      />
+                      <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                        Headers, titles, main elements
+                      </p>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                       Secondary Color
                     </label>
-                    <input
-                      type="color"
-                      value={customTemplate.colors.secondary}
-                      onChange={(e) => updateColors('secondary', e.target.value)}
-                      className="w-full h-10 border rounded"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="color"
+                        value={customTemplate.colors.secondary}
+                        onChange={(e) => updateColors('secondary', e.target.value)}
+                        className="w-full h-12 border rounded-lg cursor-pointer"
+                      />
+                      <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                        Subtitles, borders, supporting text
+                      </p>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                       Accent Color
                     </label>
-                    <input
-                      type="color"
-                      value={customTemplate.colors.accent}
-                      onChange={(e) => updateColors('accent', e.target.value)}
-                      className="w-full h-10 border rounded"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="color"
+                        value={customTemplate.colors.accent}
+                        onChange={(e) => updateColors('accent', e.target.value)}
+                        className="w-full h-12 border rounded-lg cursor-pointer"
+                      />
+                      <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                        Totals, highlights, call-to-actions
+                      </p>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                       Background
                     </label>
-                    <input
-                      type="color"
-                      value={customTemplate.colors.background}
-                      onChange={(e) => updateColors('background', e.target.value)}
-                      className="w-full h-10 border rounded"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="color"
+                        value={customTemplate.colors.background}
+                        onChange={(e) => updateColors('background', e.target.value)}
+                        className="w-full h-12 border rounded-lg cursor-pointer"
+                      />
+                      <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                        Document background color
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -345,7 +337,7 @@ export function InvoiceTemplates({
               {/* Layout Section */}
               <div>
                 <h3 className="text-lg font-medium mb-4" style={{ color: 'var(--foreground)' }}>
-                  Layout Options
+                  Layout & Structure
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -356,11 +348,14 @@ export function InvoiceTemplates({
                       value={customTemplate.layout.headerStyle}
                       onChange={(e) => updateLayout('headerStyle', e.target.value)}
                       options={[
-                        { value: 'minimal', label: 'Minimal' },
-                        { value: 'classic', label: 'Classic' },
-                        { value: 'modern', label: 'Modern' }
+                        { value: 'minimal', label: 'Minimal - Clean and simple' },
+                        { value: 'classic', label: 'Classic - Traditional business' },
+                        { value: 'modern', label: 'Modern - Contemporary design' }
                       ]}
                     />
+                    <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                      Controls header layout and styling
+                    </p>
                   </div>
                   
                   <div>
@@ -371,43 +366,61 @@ export function InvoiceTemplates({
                       value={customTemplate.layout.itemTableStyle}
                       onChange={(e) => updateLayout('itemTableStyle', e.target.value)}
                       options={[
-                        { value: 'simple', label: 'Simple' },
-                        { value: 'detailed', label: 'Detailed' },
-                        { value: 'modern', label: 'Modern' }
+                        { value: 'simple', label: 'Simple - Basic table' },
+                        { value: 'detailed', label: 'Detailed - Full borders' },
+                        { value: 'modern', label: 'Modern - Rounded corners' }
                       ]}
                     />
+                    <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                      Controls invoice items table design
+                    </p>
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={customTemplate.layout.showLogo}
-                      onChange={(e) => updateLayout('showLogo', e.target.checked)}
-                    />
-                    <span className="text-sm" style={{ color: 'var(--foreground)' }}>
-                      Show Company Logo
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={customTemplate.layout.showBorder}
-                      onChange={(e) => updateLayout('showBorder', e.target.checked)}
-                    />
-                    <span className="text-sm" style={{ color: 'var(--foreground)' }}>
-                      Show Border
-                    </span>
+                <div className="mt-6 space-y-4">
+                  <h4 className="text-md font-medium" style={{ color: 'var(--foreground)' }}>
+                    Display Options
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3 p-3 border rounded-lg" style={{ borderColor: 'var(--border)' }}>
+                      <Switch
+                        checked={customTemplate.layout.showLogo}
+                        onChange={(e) => updateLayout('showLogo', e.target.checked)}
+                      />
+                      <div>
+                        <span className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                          Show Company Logo
+                        </span>
+                        <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                          Display logo in header area
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 border rounded-lg" style={{ borderColor: 'var(--border)' }}>
+                      <Switch
+                        checked={customTemplate.layout.showBorder}
+                        onChange={(e) => updateLayout('showBorder', e.target.checked)}
+                      />
+                      <div>
+                        <span className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                          Show Borders
+                        </span>
+                        <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                          Add decorative borders
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Fonts Section */}
+              {/* Typography Section */}
               <div>
                 <h3 className="text-lg font-medium mb-4" style={{ color: 'var(--foreground)' }}>
                   Typography
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                       Font Size
@@ -416,11 +429,32 @@ export function InvoiceTemplates({
                       value={customTemplate.fonts.size}
                       onChange={(e) => updateFonts('size', e.target.value)}
                       options={[
-                        { value: 'small', label: 'Small' },
-                        { value: 'medium', label: 'Medium' },
-                        { value: 'large', label: 'Large' }
+                        { value: 'small', label: 'Small (12px) - Compact' },
+                        { value: 'medium', label: 'Medium (14px) - Standard' },
+                        { value: 'large', label: 'Large (16px) - Readable' }
                       ]}
                     />
+                    <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                      Overall document font size
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                      Font Family
+                    </label>
+                    <Select
+                      value={customTemplate.fonts.primary}
+                      onChange={(e) => updateFonts('primary', e.target.value)}
+                      options={[
+                        { value: 'Inter', label: 'Inter - Modern & Clean' },
+                        { value: 'Helvetica', label: 'Helvetica - Classic' },
+                        { value: 'Georgia', label: 'Georgia - Serif' },
+                        { value: 'Monaco', label: 'Monaco - Monospace' }
+                      ]}
+                    />
+                    <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                      Primary font family for text
+                    </p>
                   </div>
                 </div>
               </div>

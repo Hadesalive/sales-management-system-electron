@@ -1,33 +1,34 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/layouts/app-layout';
 import { Button, Toast } from '@/components/ui/core';
 import { KPICard } from '@/components/ui/dashboard';
 import { Input, Textarea } from '@/components/ui/forms';
+import { InvoicePreview } from '@/components/ui/invoice';
 import { ReceiptPreview } from '@/components/ui/invoice/receipt-preview';
-import { DynamicInvoicePreview } from '@/components/ui/invoice/dynamic-invoice-preview';
-import { InvoiceTemplate } from '@/components/ui/invoice/invoice-templates';
-import { allTemplates } from '@/components/ui/invoice/templates';
 import { useSettings } from '@/contexts/SettingsContext';
 import { 
   ArrowLeftIcon,
   PencilIcon,
+  TrashIcon,
   ArrowDownTrayIcon,
+  ShareIcon,
   PrinterIcon,
   DocumentTextIcon,
   CurrencyDollarIcon,
   ClockIcon,
   CheckCircleIcon,
   XCircleIcon,
+  UserIcon,
   CalendarIcon,
   SwatchIcon,
   PhotoIcon,
   BuildingOfficeIcon,
   PhoneIcon,
   EnvelopeIcon,
+  MapPinIcon,
   PlusIcon,
   XMarkIcon,
   CheckIcon
@@ -71,15 +72,17 @@ const mockInvoice = {
 };
 
 export default function InvoiceDetailsPage() {
+  const params = useParams();
   const router = useRouter();
   const { formatCurrency, formatDate } = useSettings();
   
-  const [invoice] = useState(mockInvoice);
-  const [loading] = useState(false);
+  const invoiceId = params.id as string;
+  
+  const [invoice, setInvoice] = useState(mockInvoice);
+  const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [viewMode, setViewMode] = useState<'invoice' | 'receipt'>('invoice');
-  const [selectedTemplate, setSelectedTemplate] = useState<'pro-corporate' | 'modern-stripe' | 'minimal-outline' | 'elegant-dark' | 'classic-column'>('pro-corporate');
-  const [currentTemplate, setCurrentTemplate] = useState<InvoiceTemplate | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<'classic' | 'modern' | 'minimal'>('classic');
   
   // Editable header/footer state
   const [isEditingHeader, setIsEditingHeader] = useState(false);
@@ -124,6 +127,27 @@ export default function InvoiceDetailsPage() {
     }
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'overdue':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'draft':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+    }
+  };
+
+  const handleDeleteInvoice = () => {
+    if (confirm('Are you sure you want to delete this invoice?')) {
+      setToast({ message: 'Invoice deleted successfully', type: 'success' });
+      setTimeout(() => router.push('/invoices'), 1000);
+    }
+  };
 
   const handlePrintInvoice = () => {
     window.print();
@@ -178,24 +202,6 @@ export default function InvoiceDetailsPage() {
     setIsEditingFooter(false);
     setToast({ message: 'Footer information saved successfully!', type: 'success' });
   };
-
-  // Template management functions
-  const getDefaultTemplate = (templateId: string): InvoiceTemplate => {
-    const template = allTemplates.find(t => t.id === templateId);
-    return template || allTemplates[0]; // Fallback to first template if not found
-  };
-
-  // Template update handler (available for child components)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleTemplateUpdate = (template: InvoiceTemplate) => {
-    setCurrentTemplate(template);
-    setToast({ message: 'Template updated successfully!', type: 'success' });
-  };
-
-  // Initialize template when selectedTemplate changes
-  React.useEffect(() => {
-    setCurrentTemplate(getDefaultTemplate(selectedTemplate));
-  }, [selectedTemplate]);
 
   if (loading) {
     return (
@@ -325,7 +331,7 @@ export default function InvoiceDetailsPage() {
                     </label>
                     <div className="flex items-center gap-4">
                       {companyLogo && (
-                        <Image src={companyLogo} alt="Company Logo" width={48} height={48} className="h-12 w-12 object-contain rounded" />
+                        <img src={companyLogo} alt="Company Logo" className="h-12 w-12 object-contain rounded" />
                       )}
                       <label className="cursor-pointer">
                         <input
@@ -400,7 +406,7 @@ export default function InvoiceDetailsPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     {companyLogo && (
-                      <Image src={companyLogo} alt="Company Logo" width={40} height={40} className="h-10 w-10 object-contain rounded" />
+                      <img src={companyLogo} alt="Company Logo" className="h-10 w-10 object-contain rounded" />
                     )}
                     <div>
                       <h4 className="font-medium" style={{ color: 'var(--foreground)' }}>
@@ -469,7 +475,7 @@ export default function InvoiceDetailsPage() {
                     <div className="space-y-3">
                       {brandLogos.map((logo, index) => (
                         <div key={index} className="flex items-center gap-3 p-3 border rounded" style={{ borderColor: 'var(--border)' }}>
-                          <Image src={logo} alt={`Brand ${index + 1}`} width={32} height={32} className="h-8 w-8 object-contain" />
+                          <img src={logo} alt={`Brand ${index + 1}`} className="h-8 w-8 object-contain" />
                           <span className="flex-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>
                             Brand Logo {index + 1}
                           </span>
@@ -534,7 +540,7 @@ export default function InvoiceDetailsPage() {
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {brandLogos.map((logo, index) => (
-                          <Image key={index} src={logo} alt={`Brand ${index + 1}`} width={24} height={24} className="h-6 w-6 object-contain" />
+                          <img key={index} src={logo} alt={`Brand ${index + 1}`} className="h-6 w-6 object-contain" />
                         ))}
                       </div>
                     </div>
@@ -570,62 +576,52 @@ export default function InvoiceDetailsPage() {
 
                 <select
                   value={selectedTemplate}
-                  onChange={(e) => setSelectedTemplate(e.target.value as 'pro-corporate' | 'modern-stripe' | 'minimal-outline' | 'elegant-dark' | 'classic-column')}
+                  onChange={(e) => setSelectedTemplate(e.target.value as 'classic' | 'modern' | 'minimal')}
                   className="px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm"
                 >
-                  <option value="pro-corporate">Pro Corporate</option>
-                  <option value="modern-stripe">Modern Stripe</option>
-                  <option value="minimal-outline">Minimal Outline</option>
-                  <option value="elegant-dark">Elegant Dark</option>
-                  <option value="classic-column">Classic Column</option>
+                  <option value="classic">Classic Template</option>
+                  <option value="modern">Modern Template</option>
+                  <option value="minimal">Minimal Template</option>
                 </select>
               </div>
 
               {/* Invoice/Receipt Preview */}
               {viewMode === 'invoice' ? (
-                currentTemplate ? (
-                  <DynamicInvoicePreview
-                    data={{
-                      invoiceNumber: invoice.number,
-                      date: invoice.issueDate,
-                      dueDate: invoice.dueDate,
-                      company: {
-                        name: companyInfo.name,
-                        address: companyInfo.address,
-                        city: companyInfo.city,
-                        state: companyInfo.state,
-                        zip: companyInfo.zip,
-                        phone: companyInfo.phone,
-                        email: companyInfo.email,
-                        logo: companyLogo
-                      },
-                      customer: {
-                        name: invoice.customerName,
-                        address: invoice.customerAddress,
-                        city: "",
-                        state: "",
-                        zip: "",
-                        phone: "",
-                        email: invoice.customerEmail
-                      },
-                      items: invoice.items,
-                      notes: footerContent.thankYouMessage,
-                      terms: footerContent.termsAndConditions,
-                      taxRate: 8.5,
-                      discount: 0
-                    }}
-                    template={currentTemplate}
-                    brandLogos={brandLogos}
-                    className="border rounded-lg p-6"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Loading template...</p>
-                    </div>
-                  </div>
-                )
+                <InvoicePreview
+                  data={{
+                    invoiceNumber: invoice.number,
+                    date: invoice.issueDate,
+                    dueDate: invoice.dueDate,
+                    company: {
+                      name: companyInfo.name,
+                      address: `${companyInfo.address}, ${companyInfo.city}, ${companyInfo.state} ${companyInfo.zip}`,
+                      city: companyInfo.city,
+                      state: companyInfo.state,
+                      zip: companyInfo.zip,
+                      phone: companyInfo.phone,
+                      email: companyInfo.email,
+                      logo: companyLogo
+                    },
+                    customer: {
+                      name: invoice.customerName,
+                      address: invoice.customerAddress,
+                      city: "",
+                      state: "",
+                      zip: "",
+                      phone: "",
+                      email: invoice.customerEmail
+                    },
+                    items: invoice.items,
+                    notes: footerContent.thankYouMessage,
+                    terms: footerContent.termsAndConditions,
+                    taxRate: 8.5,
+                    discount: 0
+                  }}
+                  onEdit={() => router.push(`/invoices/${invoice.id}/edit`)}
+                  onPrint={handlePrintInvoice}
+                  onDownload={handleDownloadInvoice}
+                  onShare={handleShareInvoice}
+                />
               ) : (
                 <ReceiptPreview
                   data={{
