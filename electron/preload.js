@@ -37,3 +37,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Remove listeners
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
 });
+
+// Also expose a general electron object for direct IPC calls (e.g., email-invoice)
+contextBridge.exposeInMainWorld('electron', {
+  ipcRenderer: {
+    invoke: (channel, data) => ipcRenderer.invoke(channel, data),
+    send: (channel, data) => ipcRenderer.send(channel, data)
+  }
+});

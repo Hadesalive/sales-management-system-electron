@@ -1,5 +1,5 @@
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import NextImage from "next/image";
 import { cn } from "@/lib/utils";
 import { Button } from "../core/button";
@@ -12,6 +12,8 @@ import { PlusIcon, TrashIcon, CheckIcon, PhotoIcon, XMarkIcon } from "@heroicons
 import { useSettings } from '@/contexts/SettingsContext';
 import { ConfirmationDialog } from '../dialogs/confirmation-dialog';
 import { useConfirmation } from '@/lib/hooks/useConfirmation';
+import { customerService, productService } from '@/lib/services';
+import { Customer, Product } from '@/lib/types/core';
 
 interface InvoiceItem {
   id: string;
@@ -36,6 +38,7 @@ interface InvoiceData {
     logo?: string;
   };
   customer: {
+    id?: string;
     name: string;
     address: string;
     city: string;
@@ -66,6 +69,13 @@ export function InvoiceBuilder({
 }: InvoiceBuilderProps) {
   const { companySettings, formatCurrency, generateInvoiceNumber } = useSettings();
   const { isOpen, options, confirm, handleConfirm, handleClose } = useConfirmation();
+  
+  // Customer and Product state
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   
   const [invoiceData, setInvoiceData] = useState<InvoiceData>({
     invoiceNumber: initialData?.invoiceNumber || generateInvoiceNumber(),
@@ -100,6 +110,78 @@ export function InvoiceBuilder({
     discount: initialData?.discount || 0
   });
 
+  // Load customers and products
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Load customers
+        const customersResponse = await customerService.getAllCustomers();
+        if (customersResponse.success && customersResponse.data) {
+          setCustomers(customersResponse.data);
+        }
+        setLoadingCustomers(false);
+
+        // Load products
+        const productsResponse = await productService.getAllProducts();
+        if (productsResponse.success && productsResponse.data) {
+          setProducts(productsResponse.data);
+        }
+        setLoadingProducts(false);
+      } catch (error) {
+        console.error('Failed to load customers/products:', error);
+        setLoadingCustomers(false);
+        setLoadingProducts(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Update state when initialData changes (e.g., when loading invoice in edit mode)
+  // Use a ref to track if we've loaded initial data
+  const [hasLoadedInitialData, setHasLoadedInitialData] = React.useState(false);
+  
+  useEffect(() => {
+    if (initialData && initialData.items && initialData.items.length > 0 && !hasLoadedInitialData) {
+      setInvoiceData({
+        invoiceNumber: initialData?.invoiceNumber || generateInvoiceNumber(),
+        date: initialData?.date || new Date().toISOString().split('T')[0],
+        dueDate: initialData?.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        company: {
+          name: initialData?.company?.name || companySettings.companyName || "TopNotch Electronics",
+          address: initialData?.company?.address || companySettings.address || "123 Business St",
+          city: initialData?.company?.city || "San Francisco",
+          state: initialData?.company?.state || "CA",
+          zip: initialData?.company?.zip || "94105",
+          phone: initialData?.company?.phone || companySettings.phone || "+1 (555) 123-4567",
+          email: initialData?.company?.email || companySettings.email || "info@topnotch.com",
+          ...initialData?.company
+        },
+        customer: {
+          id: initialData?.customer?.id,
+          name: initialData?.customer?.name || "",
+          address: initialData?.customer?.address || "",
+          city: initialData?.customer?.city || "",
+          state: initialData?.customer?.state || "",
+          zip: initialData?.customer?.zip || "",
+          phone: initialData?.customer?.phone || "",
+          email: initialData?.customer?.email || "",
+          ...initialData?.customer
+        },
+        items: initialData?.items || [],
+        notes: initialData?.notes || "",
+        terms: initialData?.terms || "Payment due within 30 days",
+        taxRate: initialData?.taxRate || 8.5,
+        discount: initialData?.discount || 0
+      });
+      // Set selected customer ID if available
+      if (initialData?.customer?.id) {
+        setSelectedCustomerId(initialData.customer.id);
+      }
+      setHasLoadedInitialData(true);
+      console.log('Loaded initial data with items:', initialData.items.length);
+    }
+  }, [initialData, hasLoadedInitialData, companySettings, generateInvoiceNumber]);
+
   const updateField = (field: string, value: string | number) => {
     setInvoiceData(prev => ({
       ...prev,
@@ -133,6 +215,45 @@ export function InvoiceBuilder({
     updateCompanyField('logo', '');
   };
 
+  const handleCustomerSelect = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    
+    if (customerId === '') {
+      // Clear customer fields
+      setInvoiceData(prev => ({
+        ...prev,
+        customer: {
+          id: undefined,
+          name: '',
+          address: '',
+          city: '',
+          state: '',
+          zip: '',
+          phone: '',
+          email: ''
+        }
+      }));
+      return;
+    }
+
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) {
+      setInvoiceData(prev => ({
+        ...prev,
+        customer: {
+          id: customer.id,
+          name: customer.name,
+          address: customer.address || '',
+          city: '',
+          state: '',
+          zip: '',
+          phone: customer.phone || '',
+          email: customer.email || ''
+        }
+      }));
+    }
+  };
+
   const updateCustomerField = (field: string, value: string) => {
     setInvoiceData(prev => ({
       ...prev,
@@ -151,10 +272,15 @@ export function InvoiceBuilder({
       rate: 0,
       amount: 0
     };
-    setInvoiceData(prev => ({
-      ...prev,
-      items: [...prev.items, newItem]
-    }));
+    console.log('Adding new item:', newItem);
+    setInvoiceData(prev => {
+      const updated = {
+        ...prev,
+        items: [...prev.items, newItem]
+      };
+      console.log('Items after add:', updated.items.length);
+      return updated;
+    });
   };
 
   const updateItem = (id: string, field: keyof InvoiceItem, value: string | number) => {
@@ -183,10 +309,15 @@ export function InvoiceBuilder({
         variant: 'danger'
       },
       () => {
-        setInvoiceData(prev => ({
-          ...prev,
-          items: prev.items.filter(item => item.id !== id)
-        }));
+        console.log('Removing item:', id);
+        setInvoiceData(prev => {
+          const updated = {
+            ...prev,
+            items: prev.items.filter(item => item.id !== id)
+          };
+          console.log('Items after remove:', updated.items.length);
+          return updated;
+        });
       }
     );
   };
@@ -382,6 +513,31 @@ export function InvoiceBuilder({
                     )}
                   </div>
                   
+                  {/* Customer Dropdown */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                      Select Customer (or enter manually below)
+                    </label>
+                    <select
+                      value={selectedCustomerId}
+                      onChange={(e) => handleCustomerSelect(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      style={{ 
+                        backgroundColor: 'var(--input-background)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--foreground)'
+                      }}
+                      disabled={loadingCustomers}
+                    >
+                      <option value="">-- New Customer (Manual Entry) --</option>
+                      {customers.map(customer => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.name} {customer.email ? `(${customer.email})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input
                       label="Customer Name"
@@ -443,6 +599,49 @@ export function InvoiceBuilder({
                     {isItemsComplete && (
                       <CheckIcon className="h-5 w-5 text-green-500" />
                     )}
+                  </div>
+                  
+                  {/* Product Quick Add */}
+                  <div className="p-4 rounded-lg border mb-4" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--card-background)' }}>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                      Quick Add from Products
+                    </label>
+                    <select
+                      onChange={(e) => {
+                        const productId = e.target.value;
+                        if (productId) {
+                          const product = products.find(p => p.id === productId);
+                          if (product) {
+                            const newItem: InvoiceItem = {
+                              id: Date.now().toString(),
+                              description: product.name,
+                              quantity: 1,
+                              rate: product.price,
+                              amount: product.price
+                            };
+                            setInvoiceData(prev => ({
+                              ...prev,
+                              items: [...prev.items, newItem]
+                            }));
+                            e.target.value = ''; // Reset dropdown
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      style={{ 
+                        backgroundColor: 'var(--input-background)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--foreground)'
+                      }}
+                      disabled={loadingProducts}
+                    >
+                      <option value="">-- Select a product to add --</option>
+                      {products.map(product => (
+                        <option key={product.id} value={product.id}>
+                          {product.name} - {formatCurrency(product.price)} {product.stock !== undefined ? `(Stock: ${product.stock})` : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   
                   <div className="space-y-4">
@@ -610,10 +809,18 @@ export function InvoiceBuilder({
         />
 
         <FormActions>
-          <Button variant="outline" onClick={() => onPreview?.(invoiceData)}>
+          <Button variant="outline" onClick={() => {
+            console.log('Preview data:', invoiceData);
+            onPreview?.(invoiceData);
+          }}>
             Preview
           </Button>
-          <Button variant="default" onClick={() => onSave?.(invoiceData)}>
+          <Button variant="default" onClick={() => {
+            console.log('Saving invoice data:', invoiceData);
+            console.log('Items count:', invoiceData.items.length);
+            console.log('Items:', JSON.stringify(invoiceData.items, null, 2));
+            onSave?.(invoiceData);
+          }}>
             Save Invoice
           </Button>
         </FormActions>

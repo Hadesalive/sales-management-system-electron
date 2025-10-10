@@ -1,8 +1,6 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
-import { cn } from '@/lib/utils';
 import { InvoiceTemplate } from './invoice-templates';
 import { TemplateRenderer } from './template-renderers';
 
@@ -18,6 +16,8 @@ interface InvoiceData {
   invoiceNumber: string;
   date: string;
   dueDate: string;
+  invoiceType?: 'invoice' | 'proforma' | 'quote' | 'credit_note' | 'debit_note';
+  currency?: string;
   company: {
     name: string;
     address: string;
@@ -42,6 +42,16 @@ interface InvoiceData {
   terms?: string;
   taxRate: number;
   discount: number;
+  paidAmount?: number;
+  balance?: number;
+  status?: 'draft' | 'pending' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  bankDetails?: {
+    bankName: string;
+    accountName?: string;
+    accountNumber: string;
+    routingNumber?: string;
+    swiftCode?: string;
+  };
 }
 
 interface DynamicInvoicePreviewProps {

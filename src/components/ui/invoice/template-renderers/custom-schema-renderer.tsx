@@ -199,7 +199,7 @@ export function CustomSchemaRenderer({ data, template, brandLogos = [] }: Templa
   const schema = template.customSchema || { nodes: [] };
 
   return (
-    <div className="min-h-screen p-10" style={{ backgroundColor: template.colors.background, color: template.colors.text, fontFamily: `${template.fonts.primary}, 'Helvetica Neue', Arial, sans-serif` }}>
+    <div className="p-10" style={{ width: '210mm', minHeight: '297mm', backgroundColor: template.colors.background, color: template.colors.text, fontFamily: `${template.fonts.primary}, 'Helvetica Neue', Arial, sans-serif` }}>
       {schema.nodes.map(node => renderNode(node))}
     </div>
   );

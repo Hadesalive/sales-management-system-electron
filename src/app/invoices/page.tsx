@@ -21,88 +21,29 @@ import {
   ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 
-// Mock invoice data - in real app, this would come from a service
-const mockInvoices = [
-  {
-    id: 'inv_001',
-    number: 'INV-2024-001',
-    type: 'standard' as const,
-    status: 'paid' as const,
-    customerName: 'Acme Corporation',
-    customerEmail: 'billing@acme.com',
-    issueDate: '2024-01-15',
-    dueDate: '2024-02-15',
-    paidDate: '2024-02-10',
-    subtotal: 2500.00,
-    tax: 212.50,
-    total: 2712.50,
-    paidAmount: 2712.50,
-    balance: 0.00,
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-02-10T14:30:00Z'
-  },
-  {
-    id: 'inv_002',
-    number: 'INV-2024-002',
-    type: 'standard' as const,
-    status: 'pending' as const,
-    customerName: 'Tech Solutions Inc',
-    customerEmail: 'finance@techsolutions.com',
-    issueDate: '2024-01-20',
-    dueDate: '2024-02-20',
-    paidDate: null,
-    subtotal: 1800.00,
-    tax: 153.00,
-    total: 1953.00,
-    paidAmount: 0.00,
-    balance: 1953.00,
-    createdAt: '2024-01-20T09:30:00Z',
-    updatedAt: '2024-01-20T09:30:00Z'
-  },
-  {
-    id: 'inv_003',
-    number: 'INV-2024-003',
-    type: 'proforma' as const,
-    status: 'draft' as const,
-    customerName: 'Startup Ventures',
-    customerEmail: 'admin@startupventures.com',
-    issueDate: '2024-01-25',
-    dueDate: '2024-02-25',
-    paidDate: null,
-    subtotal: 3200.00,
-    tax: 272.00,
-    total: 3472.00,
-    paidAmount: 0.00,
-    balance: 3472.00,
-    createdAt: '2024-01-25T16:45:00Z',
-    updatedAt: '2024-01-25T16:45:00Z'
-  },
-  {
-    id: 'inv_004',
-    number: 'INV-2024-004',
-    type: 'standard' as const,
-    status: 'overdue' as const,
-    customerName: 'Global Industries',
-    customerEmail: 'accounts@globalind.com',
-    issueDate: '2024-01-10',
-    dueDate: '2024-02-10',
-    paidDate: null,
-    subtotal: 4500.00,
-    tax: 382.50,
-    total: 4882.50,
-    paidAmount: 1000.00,
-    balance: 3882.50,
-    createdAt: '2024-01-10T11:20:00Z',
-    updatedAt: '2024-02-15T08:15:00Z'
-  }
-];
-
 export default function InvoicesPage() {
   const router = useRouter();
   const { formatCurrency, formatDate } = useSettings();
   
-  const [invoices, setInvoices] = useState(mockInvoices);
-  const [loading, setLoading] = useState(false);
+  const [invoices, setInvoices] = useState<Array<{
+    id: string;
+    number: string;
+    type: string;
+    status: string;
+    customerName: string;
+    customerEmail: string;
+    issueDate: string;
+    dueDate: string;
+    paidDate: string | null;
+    subtotal: number;
+    tax: number;
+    total: number;
+    paidAmount: number;
+    balance: number;
+    createdAt: string;
+    updatedAt: string;
+  }>>([]);
+  const [, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Search and filter states
@@ -112,9 +53,33 @@ export default function InvoicesPage() {
   const [sortBy, setSortBy] = useState<'issueDate' | 'dueDate' | 'total' | 'customerName'>('issueDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+  // Load invoices from API
+  useEffect(() => {
+    const loadInvoices = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/invoices');
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch invoices');
+        }
+
+        const invoiceData = await response.json();
+        setInvoices(invoiceData);
+      } catch (error) {
+        console.error('Failed to load invoices:', error);
+        setToast({ message: 'Failed to load invoices', type: 'error' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInvoices();
+  }, []);
+
   // Filter and sort invoices
   const filteredAndSortedInvoices = useMemo(() => {
-    let filtered = invoices.filter(invoice => {
+    const filtered = invoices.filter(invoice => {
       const matchesSearch = !searchTerm || 
         invoice.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
         invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||

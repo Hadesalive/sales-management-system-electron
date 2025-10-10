@@ -52,8 +52,10 @@ export function ClassicHeaderRenderer({ data, template }: TemplateRendererProps)
 
   return (
     <div 
-      className="min-h-screen p-8"
+      className="p-8"
       style={{
+        width: '210mm',
+        minHeight: '297mm',
         backgroundColor: template.colors.background,
         color: template.colors.text,
         fontFamily: template.fonts.primary

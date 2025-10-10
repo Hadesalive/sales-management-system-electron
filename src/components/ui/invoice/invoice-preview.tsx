@@ -16,6 +16,8 @@ interface InvoiceData {
   invoiceNumber: string;
   date: string;
   dueDate: string;
+  invoiceType?: 'invoice' | 'proforma' | 'quote' | 'credit_note' | 'debit_note';
+  currency?: string;
   company: {
     name: string;
     address: string;
@@ -40,6 +42,13 @@ interface InvoiceData {
   terms: string;
   taxRate: number;
   discount: number;
+  bankDetails?: {
+    bankName: string;
+    accountName?: string;
+    accountNumber: string;
+    routingNumber?: string;
+    swiftCode?: string;
+  };
 }
 
 interface InvoicePreviewProps {
@@ -132,8 +141,8 @@ export function InvoicePreview({
           boxSizing: 'border-box'
         }}
       >
-        {/* Main Content */}
-        <div className="flex-1">
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0">
           {/* Header */}
           <div className="flex justify-between items-start mb-12">
           <div className="flex-1">
@@ -200,30 +209,31 @@ export function InvoicePreview({
           </div>
         </div>
 
-        {/* Bill To */}
-        <div className="mb-12">
-          <h3 
-            className="text-lg font-semibold mb-4"
-            style={{ color: 'var(--foreground)' }}
-          >
-            Bill To:
-          </h3>
-          <div 
-            className="text-sm space-y-1 leading-relaxed"
-            style={{ color: 'var(--muted-foreground)' }}
-          >
-            <p className="font-medium text-base" style={{ color: 'var(--foreground)' }}>
-              {data.customer.name}
-            </p>
-            <p>{data.customer.address}</p>
-            <p>{data.customer.city}, {data.customer.state} {data.customer.zip}</p>
-            {data.customer.phone && <p>{data.customer.phone}</p>}
-            {data.customer.email && <p>{data.customer.email}</p>}
+          {/* Bill To */}
+          <div className="mb-12">
+            <h3 
+              className="text-lg font-semibold mb-4"
+              style={{ color: 'var(--foreground)' }}
+            >
+              Bill To:
+            </h3>
+            <div 
+              className="text-sm space-y-1 leading-relaxed"
+              style={{ color: 'var(--muted-foreground)' }}
+            >
+              <p className="font-medium text-base" style={{ color: 'var(--foreground)' }}>
+                {data.customer.name}
+              </p>
+              <p>{data.customer.address}</p>
+              <p>{data.customer.city}, {data.customer.state} {data.customer.zip}</p>
+              {data.customer.phone && <p>{data.customer.phone}</p>}
+              {data.customer.email && <p>{data.customer.email}</p>}
+            </div>
           </div>
         </div>
 
-        {/* Items Table */}
-        <div className="mb-12">
+        {/* Items Table - Flex Grow */}
+        <div className="mb-12 flex-grow">
           {/* Items Header with Summary */}
           <div className="flex justify-between items-center mb-4">
             <h3 
@@ -333,8 +343,8 @@ export function InvoicePreview({
           )}
         </div>
 
-        {/* Totals */}
-        <div className="flex justify-end mb-12">
+        {/* Totals - Fixed */}
+        <div className="flex justify-end mb-12 flex-shrink-0">
           <div className="w-80">
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
@@ -365,48 +375,47 @@ export function InvoicePreview({
           </div>
         </div>
 
-          {/* Notes and Terms */}
-          {(data.notes || data.terms) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
-              {data.notes && (
-                <div>
-                  <h3 
-                    className="text-base font-semibold mb-4"
-                    style={{ color: 'var(--foreground)' }}
-                  >
-                    Notes:
-                  </h3>
-                  <p 
-                    className="text-sm whitespace-pre-wrap leading-relaxed"
-                    style={{ color: 'var(--muted-foreground)' }}
-                  >
-                    {data.notes}
-                  </p>
-                </div>
-              )}
-              {data.terms && (
-                <div>
-                  <h3 
-                    className="text-base font-semibold mb-4"
-                    style={{ color: 'var(--foreground)' }}
-                  >
-                    Terms & Conditions:
-                  </h3>
-                  <p 
-                    className="text-sm whitespace-pre-wrap leading-relaxed"
-                    style={{ color: 'var(--muted-foreground)' }}
-                  >
-                    {data.terms}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Notes and Terms - Fixed */}
+        {(data.notes || data.terms) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12 flex-shrink-0">
+            {data.notes && (
+              <div>
+                <h3 
+                  className="text-base font-semibold mb-4"
+                  style={{ color: 'var(--foreground)' }}
+                >
+                  Notes:
+                </h3>
+                <p 
+                  className="text-sm whitespace-pre-wrap leading-relaxed"
+                  style={{ color: 'var(--muted-foreground)' }}
+                >
+                  {data.notes}
+                </p>
+              </div>
+            )}
+            {data.terms && (
+              <div>
+                <h3 
+                  className="text-base font-semibold mb-4"
+                  style={{ color: 'var(--foreground)' }}
+                >
+                  Terms & Conditions:
+                </h3>
+                <p 
+                  className="text-sm whitespace-pre-wrap leading-relaxed"
+                  style={{ color: 'var(--muted-foreground)' }}
+                >
+                  {data.terms}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Footer */}
+        {/* Footer - Always at Bottom */}
         <div 
-          className="mt-auto pt-8 border-t text-center text-sm"
+          className="mt-auto pt-8 border-t text-center text-sm flex-shrink-0"
           style={{ 
             borderColor: 'var(--border)',
             color: 'var(--muted-foreground)'

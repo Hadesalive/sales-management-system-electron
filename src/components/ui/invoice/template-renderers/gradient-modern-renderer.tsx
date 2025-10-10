@@ -52,8 +52,10 @@ export function GradientModernRenderer({ data, template }: TemplateRendererProps
 
   return (
     <div 
-      className="min-h-screen p-8 relative overflow-hidden"
+      className="p-8 relative overflow-hidden"
       style={{
+        width: '210mm',
+        minHeight: '297mm',
         backgroundColor: template.colors.background,
         color: template.colors.text,
         fontFamily: template.fonts.primary

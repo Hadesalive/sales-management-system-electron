@@ -92,3 +92,116 @@ export interface DatabaseSale extends Omit<Sale, 'id' | 'createdAt' | 'updatedAt
 export interface DatabaseSaleItem extends SaleItem {
   sale_id?: string;
 }
+
+export const InvoiceTemplateSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  description: z.string(),
+  preview: z.string(),
+  colors: z.object({
+    primary: z.string(),
+    secondary: z.string(),
+    accent: z.string(),
+    background: z.string(),
+    text: z.string(),
+  }),
+  layout: z.object({
+    headerStyle: z.enum(['minimal', 'classic', 'modern', 'premium']),
+    showLogo: z.boolean(),
+    showBorder: z.boolean(),
+    itemTableStyle: z.enum(['simple', 'detailed', 'modern']),
+    footerStyle: z.enum(['minimal', 'detailed']),
+  }),
+  fonts: z.object({
+    primary: z.string(),
+    secondary: z.string(),
+    size: z.enum(['small', 'medium', 'large']),
+  }),
+  customSchema: z.any().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const InvoiceItemSchema = z.object({
+  id: z.string().uuid(),
+  description: z.string().min(1),
+  quantity: z.number().int().positive(),
+  rate: z.number().positive(),
+  amount: z.number().positive(),
+});
+
+export const InvoiceSchema = z.object({
+  id: z.string().uuid(),
+  number: z.string().min(1),
+  customerId: z.string().uuid().optional(),
+  customerName: z.string().optional(),
+  customerEmail: z.string().email().optional(),
+  customerAddress: z.string().optional(),
+  customerPhone: z.string().optional(),
+  items: z.array(InvoiceItemSchema),
+  subtotal: z.number().nonnegative(),
+  tax: z.number().nonnegative(),
+  discount: z.number().nonnegative(),
+  total: z.number().nonnegative(),
+  paidAmount: z.number().nonnegative(),
+  balance: z.number().nonnegative(),
+  status: z.enum(['draft', 'pending', 'sent', 'paid', 'overdue', 'cancelled']),
+  invoiceType: z.enum(['invoice', 'proforma', 'quote', 'credit_note', 'debit_note']),
+  currency: z.string().length(3),
+  dueDate: z.string().optional(),
+  notes: z.string().optional(),
+  terms: z.string().optional(),
+  bankDetails: z.object({
+    bankName: z.string(),
+    accountName: z.string().optional(),
+    accountNumber: z.string(),
+    routingNumber: z.string().optional(),
+    swiftCode: z.string().optional(),
+  }).optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+// TypeScript types derived from schemas
+export type InvoiceTemplate = z.infer<typeof InvoiceTemplateSchema>;
+export type InvoiceItem = z.infer<typeof InvoiceItemSchema>;
+export type Invoice = z.infer<typeof InvoiceSchema>;
+
+export interface DatabaseInvoiceTemplate extends Omit<InvoiceTemplate, 'id' | 'createdAt' | 'updatedAt' | 'colors' | 'fonts' | 'layout' | 'customSchema'> {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  colors_primary?: string;
+  colors_secondary?: string;
+  colors_accent?: string;
+  colors_background?: string;
+  colors_text?: string;
+  fonts_primary?: string;
+  fonts_secondary?: string;
+  fonts_size?: string;
+  layout_header_style?: string;
+  layout_show_logo?: number; // SQLite boolean as integer
+  layout_show_border?: number; // SQLite boolean as integer
+  layout_item_table_style?: string;
+  layout_footer_style?: string;
+}
+
+export interface DatabaseInvoice extends Omit<Invoice, 'id' | 'createdAt' | 'updatedAt' | 'items' | 'bankDetails' | 'customerId'> {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  customer_id?: string;
+  customer_name?: string;
+  customer_email?: string;
+  customer_address?: string;
+  customer_phone?: string;
+  invoice_type?: string;
+  due_date?: string;
+  paid_amount?: number;
+  items?: string; // JSON string
+  bank_details?: string; // JSON string
+}
+
+export interface DatabaseInvoiceItem extends InvoiceItem {
+  invoice_id?: string;
+}

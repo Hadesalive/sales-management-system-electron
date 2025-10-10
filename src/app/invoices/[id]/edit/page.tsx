@@ -7,8 +7,43 @@ import { Button, Toast } from '@/components/ui/core';
 import { InvoiceBuilder } from '@/components/ui/invoice';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
-// Mock invoice data - in real app, this would come from a service
-const mockInvoiceData = {
+// Default invoice data structure
+const getDefaultInvoiceData = (): {
+  invoiceNumber: string;
+  date: string;
+  dueDate: string;
+  company: {
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    phone: string;
+    email: string;
+    website: string;
+    logo: string;
+  };
+  customer: {
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    phone: string;
+    email: string;
+  };
+  items: Array<{
+    id: string;
+    description: string;
+    quantity: number;
+    rate: number;
+    amount: number;
+  }>;
+  notes: string;
+  terms: string;
+  taxRate: number;
+  discount: number;
+} => ({
   invoiceNumber: 'INV-2024-001',
   date: '2024-01-15',
   dueDate: '2024-02-15',
@@ -20,6 +55,7 @@ const mockInvoiceData = {
     zip: "94105",
     phone: "+1 (555) 123-4567",
     email: "info@topnotch.com",
+    website: "",
     logo: ""
   },
   customer: {
@@ -51,27 +87,62 @@ const mockInvoiceData = {
   terms: "Payment due within 30 days of invoice date.",
   taxRate: 8.5,
   discount: 0
-};
+});
 
 export default function EditInvoicePage() {
   const params = useParams();
   const router = useRouter();
   
   const invoiceId = params.id as string;
-  const [invoiceData, setInvoiceData] = useState(mockInvoiceData);
+  const [invoiceData, setInvoiceData] = useState(getDefaultInvoiceData());
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const loadInvoiceData = useCallback(async () => {
     try {
       setLoading(true);
-      // In a real app, this would call an API to load the invoice data
-      // const response = await invoiceService.getInvoiceById(invoiceId);
-      // setInvoiceData(response.data);
       
-      // For now, use mock data
-      setInvoiceData(mockInvoiceData);
+      const response = await fetch(`/api/invoices/${invoiceId}`);
+      if (!response.ok) {
+        throw new Error('Failed to load invoice');
+      }
+      
+      const invoice = await response.json();
+      
+      // Transform API data to InvoiceBuilder format
+      const customerAddressParts = (invoice.customerAddress || '').split(',').map((s: string) => s.trim());
+      
+      setInvoiceData({
+        invoiceNumber: invoice.number,
+        date: invoice.createdAt.split('T')[0],
+        dueDate: invoice.dueDate || '',
+        company: {
+          name: "TopNotch Electronics",
+          address: "123 Business St",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94105",
+          phone: "+1 (555) 123-4567",
+          email: "info@topnotch.com",
+          website: "",
+          logo: ""
+        },
+        customer: {
+          name: invoice.customerName || '',
+          email: invoice.customerEmail || '',
+          address: customerAddressParts[0] || '',
+          city: customerAddressParts[1] || '',
+          state: customerAddressParts[2] || '',
+          zip: customerAddressParts[3] || '',
+          phone: invoice.customerPhone || ''
+        },
+        items: invoice.items || [],
+        notes: invoice.notes || '',
+        terms: invoice.terms || '',
+        taxRate: invoice.tax && invoice.subtotal ? (invoice.tax / (invoice.subtotal - (invoice.discount || 0))) * 100 : 0,
+        discount: invoice.discount && invoice.subtotal ? (invoice.discount / invoice.subtotal) * 100 : 0
+      });
     } catch (error) {
       console.error('Failed to load invoice:', error);
       setToast({ message: 'Failed to load invoice data', type: 'error' });
@@ -84,12 +155,88 @@ export default function EditInvoicePage() {
     loadInvoiceData();
   }, [loadInvoiceData]);
 
-  const handleSave = async (updatedInvoiceData: any) => {
+  const handleSave = async (updatedInvoiceData: {
+    invoiceNumber?: string;
+    date?: string;
+    dueDate?: string;
+    company?: {
+      name?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      phone?: string;
+      email?: string;
+      website?: string;
+    };
+    customer?: {
+      id?: string;
+      name?: string;
+      email?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      phone?: string;
+    };
+    items?: Array<{
+      id?: string;
+      description?: string;
+      quantity?: number;
+      rate?: number;
+      amount?: number;
+    }>;
+    notes?: string;
+    terms?: string;
+    taxRate?: number;
+    discount?: number;
+  }) => {
     try {
       setSaving(true);
       
-      // In a real app, this would call an API to update the invoice
-      console.log('Updating invoice:', invoiceId, updatedInvoiceData);
+      // Calculate totals
+      const items = updatedInvoiceData.items || [];
+      const subtotal = items.reduce((sum, item) => sum + (item.amount || 0), 0);
+      const discountAmount = (subtotal * (updatedInvoiceData.discount || 0)) / 100;
+      const taxableAmount = subtotal - discountAmount;
+      const taxAmount = (taxableAmount * (updatedInvoiceData.taxRate || 0)) / 100;
+      const total = taxableAmount + taxAmount;
+
+      // Prepare customer address
+      const customer = updatedInvoiceData.customer;
+      const customerAddress = customer ? 
+        `${customer.address || ''}${customer.city ? ', ' + customer.city : ''}${customer.state ? ', ' + customer.state : ''}${customer.zip ? ' ' + customer.zip : ''}`.trim() 
+        : '';
+
+      // Prepare the request body
+      const requestBody = {
+        number: updatedInvoiceData.invoiceNumber,
+        customerId: customer?.id || undefined,
+        customerName: customer?.name || '',
+        customerEmail: customer?.email || '',
+        customerAddress: customerAddress,
+        customerPhone: customer?.phone || '',
+        items: items,
+        subtotal: subtotal,
+        tax: taxAmount,
+        discount: discountAmount,
+        total: total,
+        dueDate: updatedInvoiceData.dueDate || '',
+        notes: updatedInvoiceData.notes || '',
+        terms: updatedInvoiceData.terms || '',
+      };
+
+      const response = await fetch(`/api/invoices/${invoiceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update invoice');
+      }
       
       setToast({ message: 'Invoice updated successfully!', type: 'success' });
       
@@ -105,7 +252,41 @@ export default function EditInvoicePage() {
     }
   };
 
-  const handlePreview = (invoiceData: any) => {
+  const handlePreview = (invoiceData: {
+    invoiceNumber?: string;
+    date?: string;
+    dueDate?: string;
+    company?: {
+      name?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      phone?: string;
+      email?: string;
+      website?: string;
+    };
+    customer?: {
+      name?: string;
+      email?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      phone?: string;
+    };
+    items?: Array<{
+      id?: string;
+      description?: string;
+      quantity?: number;
+      rate?: number;
+      amount?: number;
+    }>;
+    notes?: string;
+    terms?: string;
+    taxRate?: number;
+    discount?: number;
+  }) => {
     console.log('Preview invoice:', invoiceData);
     setToast({ message: 'Invoice preview updated', type: 'success' });
   };

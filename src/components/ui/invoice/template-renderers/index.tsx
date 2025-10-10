@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import React from 'react';
 import { InvoiceTemplate } from '../invoice-templates';
 import { ClassicHeaderRenderer } from './classic-header-renderer';
@@ -8,6 +9,7 @@ import { ModernStripeRenderer } from './modern-stripe-renderer';
 import { MinimalOutlineRenderer } from './minimal-outline-renderer';
 import { ElegantDarkRenderer } from './elegant-dark-renderer';
 import { ClassicColumnRenderer } from './classic-column-renderer';
+import { CustomSchemaRenderer } from './custom-schema-renderer';
 
 interface InvoiceItem {
   id: string;
@@ -21,6 +23,9 @@ interface InvoiceData {
   invoiceNumber: string;
   date: string;
   dueDate: string;
+  paidAmount?: number;
+  balance?: number;
+  status?: 'draft' | 'pending' | 'sent' | 'paid' | 'overdue' | 'cancelled';
   company: {
     name: string;
     address: string;
@@ -54,16 +59,21 @@ interface TemplateRendererProps {
   className?: string;
 }
 
+
 // For templates that don't have specific renderers yet, use a fallback
 function FallbackRenderer({ data, template }: TemplateRendererProps) {
   const subtotal = data.items.reduce((sum, item) => sum + item.amount, 0);
-  const tax = subtotal * (data.taxRate / 100);
-  const total = subtotal + tax - data.discount;
+  const discountAmount = subtotal * (data.discount / 100);
+  const taxableAmount = subtotal - discountAmount;
+  const tax = taxableAmount * (data.taxRate / 100);
+  const total = taxableAmount + tax;
 
   return (
     <div 
-      className="min-h-screen p-8"
+      className="p-8 relative"
       style={{
+        width: '210mm',
+        minHeight: '297mm',
         backgroundColor: template.colors.background,
         color: template.colors.text,
         fontFamily: `${template.fonts.primary}, 'Helvetica Neue', Arial, sans-serif`
@@ -258,7 +268,7 @@ function FallbackRenderer({ data, template }: TemplateRendererProps) {
                 <span>-${data.discount.toFixed(2)}</span>
               </div>
             )}
-            <div 
+            <div
               className="flex justify-between text-xl font-bold pt-2 border-t-2"
               style={{ 
                 color: template.colors.accent,
@@ -268,6 +278,26 @@ function FallbackRenderer({ data, template }: TemplateRendererProps) {
               <span>Total:</span>
               <span>${total.toFixed(2)}</span>
             </div>
+            
+            {/* Payment Information */}
+            {data.paidAmount !== undefined && data.paidAmount > 0 && (
+              <>
+                <div className="flex justify-between text-lg font-semibold pt-2" style={{ color: '#10b981' }}>
+                  <span>Paid:</span>
+                  <span>-${data.paidAmount.toFixed(2)}</span>
+                </div>
+                <div
+                  className="flex justify-between text-xl font-bold pt-2 border-t-2"
+                  style={{ 
+                    color: data.balance && data.balance > 0 ? '#f59e0b' : '#10b981',
+                    borderColor: template.colors.primary
+                  }}
+                >
+                  <span>Balance Due:</span>
+                  <span>${(data.balance || 0).toFixed(2)}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -362,6 +392,14 @@ function FallbackRenderer({ data, template }: TemplateRendererProps) {
 }
 
 export function TemplateRenderer({ data, template, brandLogos, className }: TemplateRendererProps) {
+  if (template.customSchema) {
+    return (
+      <div className={className}>
+        <CustomSchemaRenderer data={data} template={template} brandLogos={brandLogos} />
+      </div>
+    );
+  }
+
   const rendererMap = {
     'classic-header': ClassicHeaderRenderer,
     'wave-design': WaveDesignRenderer,

@@ -1,5 +1,4 @@
 import React from "react";
-import NextImage from "next/image";
 import { cn } from "@/lib/utils";
 import { Button } from "../core/button";
 import { PrinterIcon, ArrowDownTrayIcon, ShareIcon } from "@heroicons/react/24/outline";
@@ -64,27 +63,29 @@ export function ReceiptPreview({
 
   return (
     <div className={cn("max-w-md mx-auto", className)}>
-      {/* Action Buttons */}
-      <div className="flex justify-center gap-3 mb-6">
-        {onPrint && (
-          <Button variant="outline" size="sm" onClick={onPrint}>
-            <PrinterIcon className="h-4 w-4 mr-2" />
-            Print
-          </Button>
-        )}
-        {onDownload && (
-          <Button variant="outline" size="sm" onClick={onDownload}>
-            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-            Download
-          </Button>
-        )}
-        {onShare && (
-          <Button variant="outline" size="sm" onClick={onShare}>
-            <ShareIcon className="h-4 w-4 mr-2" />
-            Share
-          </Button>
-        )}
-      </div>
+      {/* Action Buttons - Hidden by default (controlled by parent) */}
+      {(onPrint || onDownload || onShare) && (
+        <div className="flex justify-center gap-3 mb-6 print:hidden">
+          {onPrint && (
+            <Button variant="outline" size="sm" onClick={onPrint}>
+              <PrinterIcon className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+          )}
+          {onDownload && (
+            <Button variant="outline" size="sm" onClick={onDownload}>
+              <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+          )}
+          {onShare && (
+            <Button variant="outline" size="sm" onClick={onShare}>
+              <ShareIcon className="h-4 w-4 mr-2" />
+              Share
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Receipt Document */}
       <div 
@@ -96,31 +97,12 @@ export function ReceiptPreview({
       >
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            {data.company.logo ? (
-              <NextImage
-                src={data.company.logo}
-                alt="Company Logo"
-                width={32}
-                height={32}
-                className="object-contain rounded-lg border"
-                style={{ borderColor: 'var(--border)' }}
-              />
-            ) : (
-              <div 
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: 'var(--accent)' }}
-              >
-                <span className="text-white font-bold text-sm">TN</span>
-              </div>
-            )}
-            <h1 
-              className="text-xl font-bold"
-              style={{ color: 'var(--foreground)' }}
-            >
-              {data.company.name}
-            </h1>
-          </div>
+          <h1 
+            className="text-xl font-bold mb-3"
+            style={{ color: 'var(--foreground)' }}
+          >
+            {data.company.name}
+          </h1>
           
           <div 
             className="text-xs space-y-1"
@@ -180,23 +162,23 @@ export function ReceiptPreview({
             </div>
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-3">
             {data.items.map((item) => (
-              <div key={item.id} className="flex justify-between text-sm">
-                <div className="flex-1">
-                  <p style={{ color: 'var(--foreground)' }}>{item.description}</p>
-                  <p 
-                    className="text-xs"
-                    style={{ color: 'var(--muted-foreground)' }}
-                  >
-                    {item.quantity} × {formatCurrency(item.rate)}
+              <div key={item.id} className="text-sm">
+                <div className="flex justify-between gap-2 mb-1">
+                  <p className="flex-1 break-words leading-tight" style={{ color: 'var(--foreground)' }}>
+                    {item.description}
                   </p>
-                </div>
-                <div className="text-right">
-                  <p style={{ color: 'var(--foreground)' }}>
+                  <p className="font-semibold whitespace-nowrap" style={{ color: 'var(--foreground)' }}>
                     {formatCurrency(item.amount)}
                   </p>
                 </div>
+                <p 
+                  className="text-xs"
+                  style={{ color: 'var(--muted-foreground)' }}
+                >
+                  {item.quantity} × {formatCurrency(item.rate)}
+                </p>
               </div>
             ))}
           </div>

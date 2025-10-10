@@ -70,5 +70,11 @@ export interface ElectronAPI {
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
+    electron?: {
+      ipcRenderer: {
+        invoke: (channel: string, data?: unknown) => Promise<unknown>;
+        send: (channel: string, data?: unknown) => void;
+      };
+    };
   }
 }

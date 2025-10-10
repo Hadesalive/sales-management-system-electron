@@ -10,18 +10,102 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 export default function NewInvoicePage() {
   const router = useRouter();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [, setIsPreviewMode] = useState(false);
 
-  const handleSave = async (invoiceData: any) => {
+  const handleSave = async (invoiceData: {
+    invoiceNumber?: string;
+    date?: string;
+    dueDate?: string;
+    company?: {
+      name: string;
+      address: string;
+      city: string;
+      state: string;
+      zip: string;
+      phone: string;
+      email: string;
+      logo?: string;
+    };
+    customer?: {
+      id?: string;
+      name: string;
+      address: string;
+      city: string;
+      state: string;
+      zip: string;
+      phone: string;
+      email: string;
+    };
+    items?: Array<{
+      id?: string;
+      description?: string;
+      quantity?: number;
+      rate?: number;
+      amount?: number;
+    }>;
+    taxRate?: number;
+    discount?: number;
+    notes?: string;
+    terms?: string;
+  }) => {
     try {
-      // In a real app, this would call an API to save the invoice
-      console.log('Saving invoice:', invoiceData);
-      
-      setToast({ message: 'Invoice saved successfully!', type: 'success' });
-      
-      // Redirect to invoices list after a short delay
+      // Generate invoice number if not provided
+      const invoiceNumber = invoiceData.invoiceNumber || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+
+      // Calculate totals
+      const items = invoiceData.items || [];
+      const subtotal = items.reduce((sum, item) => sum + (item.amount || 0), 0);
+      const discountAmount = (subtotal * (invoiceData.discount || 0)) / 100;
+      const taxableAmount = subtotal - discountAmount;
+      const taxAmount = (taxableAmount * (invoiceData.taxRate || 0)) / 100;
+      const total = taxableAmount + taxAmount;
+
+      // Prepare customer address
+      const customer = invoiceData.customer;
+      const customerAddress = customer ? 
+        `${customer.address}${customer.city ? ', ' + customer.city : ''}${customer.state ? ', ' + customer.state : ''}${customer.zip ? ' ' + customer.zip : ''}`.trim() 
+        : '';
+
+      // Prepare the request body
+      const requestBody = {
+        number: invoiceNumber,
+        customerId: customer?.id || undefined,
+        customerName: customer?.name || '',
+        customerEmail: customer?.email || '',
+        customerAddress: customerAddress,
+        customerPhone: customer?.phone || '',
+        items: items,
+        subtotal: subtotal,
+        tax: taxAmount,
+        discount: discountAmount,
+        total: total,
+        status: 'draft',
+        invoiceType: 'invoice',
+        currency: 'USD',
+        dueDate: invoiceData.dueDate || '',
+        notes: invoiceData.notes || '',
+        terms: invoiceData.terms || '',
+        bankDetails: undefined,
+      };
+
+      const response = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create invoice');
+      }
+
+      const invoice = await response.json();
+      setToast({ message: `Invoice ${invoice.number} created successfully!`, type: 'success' });
+
+      // Redirect to the new invoice after a short delay
       setTimeout(() => {
-        router.push('/invoices');
+        router.push(`/invoices/${invoice.id}`);
       }, 1000);
     } catch (error) {
       console.error('Failed to save invoice:', error);
@@ -29,7 +113,41 @@ export default function NewInvoicePage() {
     }
   };
 
-  const handlePreview = (invoiceData: any) => {
+  const handlePreview = (invoiceData: {
+    invoiceNumber?: string;
+    date?: string;
+    dueDate?: string;
+    company?: {
+      name: string;
+      address: string;
+      city: string;
+      state: string;
+      zip: string;
+      phone: string;
+      email: string;
+      logo?: string;
+    };
+    customer?: {
+      name: string;
+      address: string;
+      city: string;
+      state: string;
+      zip: string;
+      phone: string;
+      email: string;
+    };
+    items?: Array<{
+      id?: string;
+      description?: string;
+      quantity?: number;
+      rate?: number;
+      amount?: number;
+    }>;
+    taxRate?: number;
+    discount?: number;
+    notes?: string;
+    terms?: string;
+  }) => {
     console.log('Preview invoice:', invoiceData);
     setIsPreviewMode(true);
   };
