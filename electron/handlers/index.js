@@ -5,6 +5,7 @@ const { registerCustomerHandlers } = require('./customer-handlers');
 const { registerProductHandlers } = require('./product-handlers');
 const { registerSalesHandlers } = require('./sales-handlers');
 const { setupEmailHandlers } = require('./email-handlers');
+const { setupPdfHandlers } = require('./pdf-handlers');
 
 function registerAllHandlers(databaseService) {
   console.log('Registering all IPC handlers...');
@@ -16,6 +17,7 @@ function registerAllHandlers(databaseService) {
   registerProductHandlers(databaseService);
   registerSalesHandlers(databaseService);
   setupEmailHandlers(); // Email handlers don't need database service
+  setupPdfHandlers(); // PDF generation handlers
   
   console.log('All IPC handlers registered successfully');
 }

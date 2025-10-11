@@ -264,41 +264,6 @@ export function ProCorporateRenderer({ data, template, brandLogos = [] }: Templa
   // Footer component to be reused
   const InvoiceFooter = () => (
     <footer className="pt-4 border-t-2" style={{ borderColor: template.colors.accent }}>
-      {/* Bank Payment Details */}
-      {data.bankDetails && (
-        <div className="mb-4 p-4 rounded-lg" style={{ backgroundColor: `${template.colors.accent}10` }}>
-          <div className="font-semibold mb-2 text-sm" style={{ color: template.colors.accent }}>Payment Details</div>
-          <div className="text-xs space-y-1">
-            <div className="flex justify-between">
-              <span className="font-medium">Bank:</span>
-              <span>{data.bankDetails.bankName}</span>
-            </div>
-            {data.bankDetails.accountName && (
-              <div className="flex justify-between">
-                <span className="font-medium">Account Name:</span>
-                <span>{data.bankDetails.accountName}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="font-medium">Account Number:</span>
-              <span>{data.bankDetails.accountNumber}</span>
-            </div>
-            {data.bankDetails.routingNumber && (
-              <div className="flex justify-between">
-                <span className="font-medium">Routing/Sort Code:</span>
-                <span>{data.bankDetails.routingNumber}</span>
-              </div>
-            )}
-            {data.bankDetails.swiftCode && (
-              <div className="flex justify-between">
-                <span className="font-medium">SWIFT/BIC:</span>
-                <span>{data.bankDetails.swiftCode}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Notes & Terms */}
       <div className="grid grid-cols-2 gap-4 mb-3">
         {data.notes && (
@@ -315,6 +280,15 @@ export function ProCorporateRenderer({ data, template, brandLogos = [] }: Templa
         )}
       </div>
 
+      {/* Bank Payment Details - Single horizontal line */}
+      {data.bankDetails && (
+        <div className="pt-2 border-t border-gray-200">
+          <div className="text-xs">
+            Bank Details Bank : {data.bankDetails.bankName} BBAN#: {data.bankDetails.accountNumber} Account#: {data.bankDetails.accountName}
+          </div>
+        </div>
+      )}
+
       {/* Brand Logos */}
       {brandLogos.length > 0 && (
         <div className="flex items-center gap-3 mt-2 pt-2 border-t" style={{ borderColor: template.colors.secondary }}>
@@ -327,14 +301,14 @@ export function ProCorporateRenderer({ data, template, brandLogos = [] }: Templa
     </footer>
   );
 
-  // Industry standard: Maximize items per page (10 items)
+  // Optimized for A4: Maximize items per page (18 items for better space usage)
   // If totals don't fit on last page with items, they get their own page
-  const adjustedPages = paginateInvoiceItems(data.items, { itemsPerPage: 10 });
+  const adjustedPages = paginateInvoiceItems(data.items, { itemsPerPage: 18 });
   
   // Determine if we need a separate totals page
-  // If last page has more than 3 items, totals/footer need their own page
-  const needsSeparateTotalsPage = adjustedPages.length > 0 && 
-    adjustedPages[adjustedPages.length - 1].items.length > 3;
+  // If last page has more than 5 items, totals/footer need their own page
+  const needsSeparateTotalsPage = adjustedPages.length > 0 &&
+    adjustedPages[adjustedPages.length - 1].items.length > 5;
 
   return (
     <>
@@ -360,14 +334,14 @@ export function ProCorporateRenderer({ data, template, brandLogos = [] }: Templa
               backgroundColor: 'white',
               color: template.colors.text,
               fontFamily: `${template.fonts.primary}, 'Helvetica Neue', Arial, sans-serif`,
-              border: template.layout.showBorder ? `3px solid ${template.colors.accent}` : 'none',
+              border: template.layout.showBorder ? `6px solid ${template.colors.accent}` : 'none',
               borderRadius: template.layout.showBorder ? '8px' : '0px',
               boxSizing: 'border-box',
               position: 'relative',
-              boxShadow: template.layout.showBorder ? `0 3px 15px rgba(0,0,0,0.12)` : 'none',
-              margin: template.layout.showBorder ? '2mm' : '0mm',
+              boxShadow: template.layout.showBorder ? `0 6px 25px rgba(0,0,0,0.18)` : 'none',
+              margin: template.layout.showBorder ? '5mm' : '0mm',
               marginBottom: pageIdx < adjustedPages.length - 1 ? '10mm' : '0',
-              padding: '10mm',
+              padding: '15mm',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column'
@@ -519,13 +493,13 @@ export function ProCorporateRenderer({ data, template, brandLogos = [] }: Templa
               backgroundColor: 'white',
               color: template.colors.text,
               fontFamily: `${template.fonts.primary}, 'Helvetica Neue', Arial, sans-serif`,
-              border: template.layout.showBorder ? `3px solid ${template.colors.accent}` : 'none',
+              border: template.layout.showBorder ? `6px solid ${template.colors.accent}` : 'none',
               borderRadius: template.layout.showBorder ? '8px' : '0px',
               boxSizing: 'border-box',
               position: 'relative',
-              boxShadow: template.layout.showBorder ? `0 3px 15px rgba(0,0,0,0.12)` : 'none',
-              margin: template.layout.showBorder ? '2mm' : '0mm',
-              padding: '10mm',
+              boxShadow: template.layout.showBorder ? `0 6px 25px rgba(0,0,0,0.18)` : 'none',
+              margin: template.layout.showBorder ? '5mm' : '0mm',
+              padding: '15mm',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column'

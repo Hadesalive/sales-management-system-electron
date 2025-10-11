@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/layouts/app-layout';
 import { Button, Alert, Toast } from '@/components/ui/core';
@@ -38,13 +38,7 @@ export default function SaleDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  useEffect(() => {
-    if (saleId) {
-      loadSaleDetails();
-    }
-  }, [saleId]);
-
-  const loadSaleDetails = async () => {
+  const loadSaleDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -66,7 +60,13 @@ export default function SaleDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [saleId]);
+
+  useEffect(() => {
+    if (saleId) {
+      loadSaleDetails();
+    }
+  }, [saleId, loadSaleDetails]);
 
   const handleDeleteSale = () => {
     if (!saleDetails?.sale) return;
@@ -92,68 +92,6 @@ export default function SaleDetailsPage() {
         setToast({ message: 'Failed to delete sale', type: 'error' });
       }
     });
-  };
-
-  const handleGenerateInvoice = async () => {
-    if (!saleDetails?.sale) return;
-
-    try {
-      const sale = saleDetails.sale;
-      
-      // Generate invoice number
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
-      
-      // Prepare invoice data from sale
-      const invoiceData = {
-        number: invoiceNumber,
-        customerId: sale.customerId || undefined,
-        customerName: sale.customerName || 'Walk-in Customer',
-        customerEmail: '',
-        customerAddress: '',
-        customerPhone: '',
-        items: sale.items.map((item, index) => ({
-          id: `item-${index}`,
-          description: item.productName,
-          quantity: item.quantity,
-          rate: item.unitPrice,
-          amount: item.total
-        })),
-        subtotal: sale.subtotal,
-        tax: sale.tax,
-        discount: sale.discount,
-        total: sale.total,
-        status: 'draft',
-        invoiceType: 'invoice',
-        currency: 'USD',
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        notes: sale.notes || 'Generated from sale',
-        terms: 'Payment due within 30 days',
-        paidAmount: sale.status === 'completed' ? sale.total : 0,
-      };
-
-      const response = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(invoiceData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create invoice');
-      }
-
-      const invoice = await response.json();
-      setToast({ message: `Invoice ${invoice.number} generated successfully!`, type: 'success' });
-      
-      // Redirect to the new invoice after a short delay
-      setTimeout(() => {
-        router.push(`/invoices/${invoice.id}`);
-      }, 1500);
-    } catch (error) {
-      console.error('Failed to generate invoice:', error);
-      setToast({ message: 'Failed to generate invoice', type: 'error' });
-    }
   };
 
   const getStatusIcon = (status: string) => {

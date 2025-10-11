@@ -19,7 +19,7 @@ interface InvoiceItem {
   amount: number;
 }
 
-interface InvoiceData {
+export interface InvoiceData {
   invoiceNumber: string;
   date: string;
   dueDate: string;
@@ -168,10 +168,10 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
     margin: { top: 20, bottom: 30 },
     
     // Add page numbers
-    didDrawPage: (data) => {
+    didDrawPage: () => {
       // Page number footer
-      const pageCount = (pdf as any).internal.getNumberOfPages();
-      const pageNumber = (pdf as any).internal.getCurrentPageInfo().pageNumber;
+      const pageCount = (pdf as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
+      const pageNumber = (pdf as unknown as { internal: { getCurrentPageInfo: () => { pageNumber: number } } }).internal.getCurrentPageInfo().pageNumber;
       
       pdf.setFontSize(8);
       pdf.setTextColor(150);
@@ -185,7 +185,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   });
 
   // Get Y position after table (AutoTable places it perfectly!)
-  const finalY = (pdf as any).lastAutoTable.finalY;
+  const finalY = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
   // ===== TOTALS SECTION =====
   // AutoTable ensures this goes on a new page if needed!
@@ -195,7 +195,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
   
-  pdf.text('Subtotal:', totalsX, totals StartY, { align: 'right' });
+  pdf.text('Subtotal:', totalsX, totalsStartY, { align: 'right' });
   pdf.text(formatCurrency(subtotal), 190, totalsStartY, { align: 'right' });
 
   if (data.taxRate > 0) {

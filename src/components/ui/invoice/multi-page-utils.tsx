@@ -40,7 +40,7 @@ export interface InvoicePage {
 /**
  * Split invoice items into pages for multi-page rendering
  *
- * Industry standard: 10-15 items per A4 page (we use 12 as default)
+ * Optimized for A4: 15-20 items per page for better space usage
  * This accounts for header, company info, totals, and footer space
  *
  * The key insight: The last page needs space for totals section, so it should have fewer items
@@ -50,7 +50,7 @@ export function paginateInvoiceItems(
   config: PageConfig = {}
 ): InvoicePage[] {
   const {
-    itemsPerPage = 12, // Industry standard for A4 invoices
+    itemsPerPage = 18, // Optimized for A4 invoices (better space usage)
   } = config;
 
   if (items.length === 0) {
@@ -68,7 +68,7 @@ export function paginateInvoiceItems(
   // Calculate how many items can fit on each page
   // Last page needs extra space for totals section (~80mm)
   const regularPageItems = itemsPerPage; // Full pages can have max items
-  const lastPageItems = Math.max(1, itemsPerPage - 3); // Last page needs room for totals
+  const lastPageItems = Math.max(1, 5); // Last page should have 5 items max for totals
 
   // If we have very few items, just put them on one page
   if (items.length <= regularPageItems) {

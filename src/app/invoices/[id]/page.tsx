@@ -12,7 +12,6 @@ import { DynamicInvoicePreview } from '@/components/ui/invoice/dynamic-invoice-p
 import { InvoiceTemplate } from '@/components/ui/invoice/invoice-templates';
 import { allTemplates } from '@/components/ui/invoice/templates';
 import { useSettings } from '@/contexts/SettingsContext';
-import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { 
   ArrowLeftIcon,
@@ -91,6 +90,9 @@ export default function InvoiceDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const { formatCurrency, formatDate, companySettings } = useSettings();
+  
+  // PDF mode detection (for future use if needed)
+  // const isPDFMode = typeof window !== 'undefined' && window.location.search.includes('pdf=true');
 
   const [invoice, setInvoice] = useState(getDefaultInvoice());
   const [loading, setLoading] = useState(true);
@@ -169,80 +171,213 @@ export default function InvoiceDetailsPage() {
     window.print();
   };
 
-  // Download Invoice as PDF (captures the exact A4 node, with white background and no zoom)
+  // Download Invoice as PDF by capturing actual rendered HTML
   const handleDownloadInvoice = async () => {
     try {
-      const wrapper = invoiceRef.current;
-      if (!wrapper) {
-        setToast({ message: 'Invoice element not found', type: 'error' });
-        return;
-      }
-
-      // Target the exact A4 container
-      const original = wrapper.querySelector('.print-invoice') as HTMLElement | null ?? wrapper;
-
-      // Clone the node to avoid messing up the live preview
-      const clone = original.cloneNode(true) as HTMLElement;
-      // Strip transforms / scaling applied by zoom
-      clone.style.transform = 'none';
-      clone.style.transformOrigin = 'top left';
-      clone.style.position = 'absolute';
-      clone.style.left = '-9999px';
-      clone.style.top = '0';
-      clone.style.boxShadow = 'none';
-      clone.style.background = '#ffffff';
-      document.body.appendChild(clone);
-
       setToast({ message: 'Generating PDF...', type: 'success' });
 
-      // Capture clone with enhanced options to avoid color parsing errors
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        onclone: (clonedDoc) => {
-          // Force color-scheme to light to avoid lab() color issues
-          const clonedElement = clonedDoc.querySelector('.print-invoice');
-          if (clonedElement) {
-            (clonedElement as HTMLElement).style.colorScheme = 'light';
-            (clonedElement as HTMLElement).style.backgroundColor = '#ffffff';
-          }
+      // Check if we're in Electron environment
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        // Get the actual rendered invoice HTML from the DOM
+        const invoiceElement = invoiceRef.current;
+        
+        if (!invoiceElement) {
+          throw new Error('Invoice preview not found');
         }
-      });
 
-      // Remove clone immediately
-      document.body.removeChild(clone);
+        console.log('Capturing HTML from rendered invoice...');
+        
+        // Get all computed styles and inline them
+        const clonedElement = invoiceElement.cloneNode(true) as HTMLElement;
+        
+        // Capture actual computed styles from the live DOM elements
+        const originalElements = invoiceElement.querySelectorAll('.print-invoice');
+        const printInvoiceElements = clonedElement.querySelectorAll('.print-invoice');
+        
+        printInvoiceElements.forEach((element, index) => {
+          const htmlElement = element as HTMLElement;
+          const originalElement = originalElements[index] as HTMLElement;
+          
+          // Get the actual computed styles from the rendered preview
+          const computedStyle = window.getComputedStyle(originalElement);
+          
+          // Capture ALL the important styles from the actual rendered element (excluding margins)
+          const stylesToCapture = [
+            'width', 'height', 'backgroundColor', 'color', 'fontFamily',
+            'border', 'borderWidth', 'borderStyle', 'borderColor', 'borderRadius',
+            'boxShadow', 'boxSizing', 'position', 'overflow', 'display', 'flexDirection'
+          ];
+          
+          const capturedStyles = stylesToCapture
+            .map(prop => {
+              const kebabCaseProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+              const value = computedStyle.getPropertyValue(kebabCaseProp);
+              return value ? `${kebabCaseProp}: ${value} !important;` : '';
+            })
+            .filter(Boolean)
+            .join('\n            ');
+          
+          // Force equal padding and margins on all sides - override any captured margin styles
+          const paddingValue = computedStyle.getPropertyValue('padding-top') || '15mm';
+          const marginValue = '0 auto'; // Center the pages
+          const equalStyles = `
+            padding: ${paddingValue} !important;
+            margin: ${marginValue} !important;
+            margin-top: 0 !important;
+            margin-right: auto !important;
+            margin-bottom: 0 !important;
+            margin-left: auto !important;
+          `;
+          
+          htmlElement.setAttribute('style', capturedStyles + '\n            ' + equalStyles);
+        });
+        
+        // Get all stylesheets
+        const styles = Array.from(document.styleSheets)
+          .map(styleSheet => {
+            try {
+              return Array.from(styleSheet.cssRules)
+                .map(rule => rule.cssText)
+                .join('\n');
+            } catch {
+              // Skip external stylesheets that can't be accessed
+              return '';
+            }
+          })
+          .join('\n');
 
-      // Create PDF - handle multi-page invoices
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const imgData = canvas.toDataURL('image/png');
+        // Create full HTML document with styles
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Invoice ${invoice.number}</title>
+              <script src="https://cdn.tailwindcss.com"></script>
+              <style>
+                ${styles}
+                
+                  body {
+                    margin: 0;
+                    padding: 0;
+                    background: transparent;
+                  }
+                  
+                  .print-invoice:last-child {
+                    page-break-after: avoid !important;
+                  }
+                
+                /* Ensure borders are visible in PDF */
+                .print-invoice {
+                  border-style: solid !important;
+                  border-width: 6px !important;
+                  border-color: #f59e0b !important;
+                  box-shadow: 0 6px 25px rgba(0,0,0,0.18) !important;
+                  border-radius: 8px !important;
+                }
+                
+                @media print {
+                  body { margin: 0; }
+                  @page {
+                    size: A4;
+                    margin: 0;
+                  }
+                }
+                
+                * {
+                  -webkit-print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+              </style>
+            </head>
+            <body>
+              ${clonedElement.innerHTML}
+            </body>
+          </html>
+        `;
 
-      // If the content fits on one page, add it normally
-      if (imgHeight <= pageHeight) {
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        console.log('Sending HTML to Electron for PDF generation...');
+        console.log('HTML Preview (first 500 chars):', htmlContent.substring(0, 500));
+        console.log('Number of .print-invoice elements found:', printInvoiceElements.length);
+        
+        // Debug: Check what border and padding styles were captured from the preview
+        originalElements.forEach((element, index) => {
+          const originalElement = element as HTMLElement;
+          const computedStyle = window.getComputedStyle(originalElement);
+          console.log(`Element ${index} captured styles:`, {
+            border: computedStyle.border,
+            borderWidth: computedStyle.borderWidth,
+            borderStyle: computedStyle.borderStyle,
+            borderColor: computedStyle.borderColor,
+            borderRadius: computedStyle.borderRadius,
+            boxShadow: computedStyle.boxShadow,
+            paddingTop: computedStyle.paddingTop,
+            paddingRight: computedStyle.paddingRight,
+            paddingBottom: computedStyle.paddingBottom,
+            paddingLeft: computedStyle.paddingLeft
+          });
+          
+          // Also check what styles are actually applied to the cloned element
+          const clonedElement = printInvoiceElements[index] as HTMLElement;
+          console.log(`Element ${index} final applied styles:`, clonedElement.getAttribute('style'));
+        });
+
+        const pdfBase64 = await window.electron.ipcRenderer.invoke('generate-invoice-pdf-from-html', {
+          htmlContent
+        }) as string;
+
+        console.log('Received PDF base64, length:', pdfBase64?.length);
+
+        if (!pdfBase64) {
+          throw new Error('No PDF data received from Electron');
+        }
+
+        // Convert base64 to blob
+        const byteCharacters = atob(pdfBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const pdfBlob = new Blob([byteArray], { type: 'application/pdf' });
+
+        console.log('PDF Blob created, size:', pdfBlob.size);
+
+        // Create download link
+        const url = window.URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Invoice-${invoice.number}.pdf`;
+        
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up
+        window.URL.revokeObjectURL(url);
       } else {
-        // Multi-page: split the canvas into A4-sized pages
-        let heightLeft = imgHeight;
-        let position = 0;
-
-        // Add first page
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-
-        // Add remaining pages
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
+        // Fallback to API route for web environment
+        const response = await fetch(`/api/invoices/${invoice.id}/pdf?template=${selectedTemplate}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to generate PDF');
         }
+
+        const pdfBlob = await response.blob();
+        const url = window.URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Invoice-${invoice.number}.pdf`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        window.URL.revokeObjectURL(url);
       }
-      
-      pdf.save(`Invoice-${invoice.number}.pdf`);
 
       setToast({ message: 'Invoice downloaded successfully!', type: 'success' });
     } catch (error) {
@@ -251,7 +386,7 @@ export default function InvoiceDetailsPage() {
     }
   };
 
-  // Download Receipt as PDF
+  // Download Receipt as PDF (keeping html2canvas for thermal receipts)
   const handleDownloadReceipt = async () => {
     try {
       const element = receiptRef.current;
@@ -260,8 +395,10 @@ export default function InvoiceDetailsPage() {
         return;
       }
 
-      setToast({ message: 'Generating PDF...', type: 'success' });
+      setToast({ message: 'Generating receipt PDF...', type: 'success' });
 
+      // For receipts, we'll use a simple approach since they're smaller
+      // You could also create a separate receipt API endpoint if needed
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -269,20 +406,21 @@ export default function InvoiceDetailsPage() {
         backgroundColor: '#ffffff'
       });
 
-      // Thermal receipt size (80mm width)
-      const imgWidth = 80;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      const pdf = new jsPDF('p', 'mm', [imgWidth, imgHeight]);
+      // Create a simple PDF using canvas
       const imgData = canvas.toDataURL('image/png');
       
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      pdf.save(`Receipt-${invoice.number}.pdf`);
+      // Create a simple download link for the image
+      const link = document.createElement('a');
+      link.download = `Receipt-${invoice.number}.png`;
+      link.href = imgData;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       
       setToast({ message: 'Receipt downloaded successfully!', type: 'success' });
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      setToast({ message: 'Failed to generate PDF', type: 'error' });
+      console.error('Error generating receipt:', error);
+      setToast({ message: 'Failed to generate receipt', type: 'error' });
     }
   };
 
@@ -294,79 +432,20 @@ export default function InvoiceDetailsPage() {
         return;
       }
 
-      const wrapper = invoiceRef.current;
-      if (!wrapper) {
-        setToast({ message: 'Invoice element not found', type: 'error' });
-        return;
-      }
-
       setToast({ message: 'Generating PDF for email...', type: 'success' });
 
-      // Target the exact A4 container
-      const original = wrapper.querySelector('.print-invoice') as HTMLElement | null ?? wrapper;
-
-      // Clone the node to avoid messing up the live preview
-      const clone = original.cloneNode(true) as HTMLElement;
-      clone.style.transform = 'none';
-      clone.style.transformOrigin = 'top left';
-      clone.style.position = 'absolute';
-      clone.style.left = '-9999px';
-      clone.style.top = '0';
-      clone.style.boxShadow = 'none';
-      clone.style.background = '#ffffff';
-      document.body.appendChild(clone);
-
-      // Capture clone with enhanced options to avoid color parsing errors
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        onclone: (clonedDoc) => {
-          // Force color-scheme to light to avoid lab() color issues
-          const clonedElement = clonedDoc.querySelector('.print-invoice');
-          if (clonedElement) {
-            (clonedElement as HTMLElement).style.colorScheme = 'light';
-            (clonedElement as HTMLElement).style.backgroundColor = '#ffffff';
-          }
-        }
-      });
-
-      // Remove clone immediately
-      document.body.removeChild(clone);
-
-      // Create PDF - handle multi-page invoices
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const imgData = canvas.toDataURL('image/png');
-
-      // If the content fits on one page, add it normally
-      if (imgHeight <= pageHeight) {
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      } else {
-        // Multi-page: split the canvas into A4-sized pages
-        let heightLeft = imgHeight;
-        let position = 0;
-
-        // Add first page
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-
-        // Add remaining pages
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
-        }
+      // Get PDF from our new API endpoint with current template
+      const response = await fetch(`/api/invoices/${invoice.id}/pdf?template=${selectedTemplate}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
       }
+
+      const pdfBlob = await response.blob();
 
       // Check if running in Electron
       if (typeof window !== 'undefined' && window.electron) {
-        // Get PDF as blob
-        const pdfBlob = pdf.output('blob');
+        // Convert blob to base64 for Electron
         const reader = new FileReader();
         
         reader.onloadend = async () => {
@@ -423,7 +502,14 @@ export default function InvoiceDetailsPage() {
         
         // Automatically download the PDF for user to attach
         setTimeout(() => {
-          pdf.save(`Invoice-${invoice.number}.pdf`);
+          const url = window.URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `Invoice-${invoice.number}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
         }, 500);
       }
     } catch (error) {
@@ -1317,6 +1403,7 @@ export default function InvoiceDetailsPage() {
                     currentTemplate ? (
                       <div 
                         ref={invoiceRef}
+                        data-invoice-preview
                         className="shadow-xl rounded-lg border transition-transform duration-300 overflow-hidden bg-white"
                         style={{
                           transform: `scale(${previewZoom / 100})`,
