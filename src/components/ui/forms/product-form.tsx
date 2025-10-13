@@ -199,7 +199,7 @@ export function ProductForm({
   return (
     <div className="fixed inset-0 backdrop-blur-sm bg-white/20 dark:bg-black/20 flex items-center justify-center p-4 z-50">
       <div 
-        className="rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+        className="rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto"
         style={{ backgroundColor: 'var(--card)' }}
       >
         {/* Header */}

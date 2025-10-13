@@ -50,9 +50,13 @@ export default function ProductsPage() {
       
       if (response.success && response.data) {
         setProducts(response.data);
+      } else {
+        setProducts([]); // Set empty array if no data
+        setToast({ message: response.error || 'Failed to load products', type: 'error' });
       }
     } catch (error) {
       console.error('Failed to load products:', error);
+      setProducts([]); // Set empty array on error
       setToast({ message: 'Failed to load products', type: 'error' });
     } finally {
       setLoading(false);
@@ -91,7 +95,8 @@ export default function ProductsPage() {
   };
 
   const handleDeleteProduct = (productId: string) => {
-    const product = products.find(p => p.id === productId);
+    const currentProducts = products || [];
+    const product = currentProducts.find(p => p.id === productId);
     confirm({
       title: 'Delete Product',
       message: `Are you sure you want to delete "${product?.name}"? This action cannot be undone.`,
@@ -119,13 +124,15 @@ export default function ProductsPage() {
 
   // Get unique categories for filter
   const categories = useMemo(() => {
-    const categorySet = new Set(products.map(p => p.category).filter(Boolean));
+    const currentProducts = products || [];
+    const categorySet = new Set(currentProducts.map(p => p.category).filter(Boolean));
     return Array.from(categorySet).sort();
   }, [products]);
 
   // Filter and sort products
   const filteredAndSortedProducts = useMemo(() => {
-    const filtered = products.filter(product => {
+    const currentProducts = products || [];
+    const filtered = currentProducts.filter(product => {
       const matchesSearch = !searchTerm || 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -240,10 +247,11 @@ export default function ProductsPage() {
 
   // Calculate stats
   const stats = useMemo(() => {
-    const totalProducts = products.length;
-    const activeProducts = products.filter(p => p.isActive !== false).length;
-    const lowStockProducts = products.filter(p => p.minStock && p.stock <= p.minStock).length;
-    const totalValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
+    const currentProducts = products || [];
+    const totalProducts = currentProducts.length;
+    const activeProducts = currentProducts.filter(p => p.isActive !== false).length;
+    const lowStockProducts = currentProducts.filter(p => p.minStock && p.stock <= p.minStock).length;
+    const totalValue = currentProducts.reduce((sum, p) => sum + (p.price * p.stock), 0);
     
     return {
       totalProducts,
@@ -367,7 +375,7 @@ export default function ProductsPage() {
         {/* Results Summary */}
         <div className="flex items-center justify-between text-sm" style={{ color: 'var(--muted-foreground)' }}>
           <span>
-            Showing {filteredAndSortedProducts.length} of {products.length} products
+            Showing {filteredAndSortedProducts.length} of {(products || []).length} products
             {searchTerm && ` matching "${searchTerm}"`}
             {selectedCategory && ` in ${selectedCategory}`}
           </span>

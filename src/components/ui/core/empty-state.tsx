@@ -160,7 +160,7 @@ export function EmptyStateCard({
   return (
     <div 
       className={cn(
-        "rounded-xl shadow-sm p-8",
+        "rounded-xl p-8",
         className
       )}
       style={{ 

@@ -20,7 +20,7 @@ export function FormCard({
 }: FormCardProps) {
   return (
     <div 
-      className={cn("rounded-xl shadow-sm p-6", className)} 
+      className={cn("rounded-xl p-6", className)} 
       style={{ 
         background: 'var(--card)', 
         border: '1px solid var(--border)' 

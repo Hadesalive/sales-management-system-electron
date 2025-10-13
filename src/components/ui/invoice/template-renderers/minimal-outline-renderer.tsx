@@ -57,6 +57,41 @@ interface TemplateRendererProps {
   brandLogos?: string[];
 }
 
+// Add print styles to ensure proper layout when printed
+// Commented out as not currently used, but kept for future multi-page support
+// const printStyles = `
+//   @media print {
+//     /* Zero page margins - let printer handle all margins */
+//     @page {
+//       size: A4;
+//       margin: 0 0 6mm 0; /* Top: 0mm, Right: 0mm, Bottom: 6mm, Left: 0mm */
+//     }
+
+//     .print-invoice * {
+//       -webkit-print-color-adjust: exact !important;
+//       color-adjust: exact !important;
+//       print-color-adjust: exact !important;
+//     }
+//
+//     .print-invoice {
+//       margin: 0 !important; /* Let @page handle margins */
+//       box-shadow: none !important;
+//     }
+//     
+//     /* Hide info banner when printing */
+//     .pagination-controls {
+//       display: none !important;
+//     }
+//   }
+//   
+//   /* Fix for html2canvas lab() color parsing error */
+//   @media screen {
+//     .print-invoice {
+//       color-scheme: light;
+//     }
+//   }
+// `;
+
 export function MinimalOutlineRenderer({ data, template, brandLogos = [] }: TemplateRendererProps) {
   const subtotal = data.items.reduce((sum, i) => sum + i.amount, 0);
   const tax = subtotal * (data.taxRate / 100);
@@ -64,10 +99,25 @@ export function MinimalOutlineRenderer({ data, template, brandLogos = [] }: Temp
   const currency = data.currency || 'USD';
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
+    const currencySymbols: Record<string, string> = {
+      'USD': '$',
+      'SLL': 'Le',
+      'EUR': '€',
+      'GBP': '£',
+      'CAD': 'C$',
+      'AUD': 'A$'
+    };
+    
+    const symbol = currencySymbols[currency] || currency;
+    return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  // Helper function to convert relative paths to absolute URLs
+  const getImageUrl = (src: string) => {
+    if (src.startsWith('/')) {
+      return `${window.location.origin}${src}`;
+    }
+    return src;
   };
 
   // Footer component
@@ -85,12 +135,39 @@ export function MinimalOutlineRenderer({ data, template, brandLogos = [] }: Temp
           <div className="text-xs" style={{ color: template.colors.text }}>{data.terms}</div>
         </div>
       )}
+      
+      {/* Bank Details */}
+      {data.bankDetails && (
+        <div className="mb-3 p-3 rounded" style={{ backgroundColor: `${template.colors.primary}05` }}>
+          <div className="font-semibold mb-1 text-sm" style={{ color: template.colors.primary }}>Bank Details</div>
+          <div className="text-xs">
+            <div>Bank: {data.bankDetails.bankName}</div>
+            {data.bankDetails.accountName && <div>Account: {data.bankDetails.accountName}</div>}
+            <div>Account #: {data.bankDetails.accountNumber}</div>
+            {data.bankDetails.routingNumber && <div>Routing #: {data.bankDetails.routingNumber}</div>}
+            {data.bankDetails.swiftCode && <div>SWIFT: {data.bankDetails.swiftCode}</div>}
+          </div>
+        </div>
+      )}
+      
       {brandLogos.length > 0 && (
         <div className="flex items-center gap-3 mt-2">
-          {brandLogos.map((logo, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={logo} alt={`Brand ${i + 1}`} className="h-6 w-auto object-contain opacity-80" />
-          ))}
+          {brandLogos.map((logo, i) => {
+            const logoSrc = getImageUrl(logo);
+            return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img 
+                key={i} 
+                src={logoSrc} 
+                alt={`Brand ${i + 1}`} 
+                className="h-6 w-auto object-contain opacity-80"
+                onError={(e) => {
+                  // Hide broken images in PDF
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            );
+          })}
         </div>
       )}
     </footer>

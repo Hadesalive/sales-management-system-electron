@@ -11,6 +11,7 @@
 export interface InvoiceItem {
   id: string;
   description: string;
+  itemDescription?: string; // Additional item-specific description
   quantity: number;
   rate: number;
   amount: number;
@@ -19,10 +20,18 @@ export interface InvoiceItem {
 export interface PageConfig {
   /** Maximum number of items per page (default: 12 for A4) */
   itemsPerPage?: number;
+  /** First page capacity multiplier (default: 0.85 - accounts for header space) */
+  firstPageCapacity?: number;
+  /** Last page capacity multiplier (default: 0.75 - accounts for totals/footer space) */
+  lastPageCapacity?: number;
+  /** Threshold for separate totals page (default: 8 items) */
+  separateTotalsThreshold?: number;
   /** Whether to show page numbers (default: true) */
   showPageNumbers?: boolean;
   /** Whether to show "Continued..." on overflow pages (default: true) */
   showContinuedLabel?: boolean;
+  /** Template type for dynamic calculations */
+  templateType?: 'compact' | 'standard' | 'detailed';
 }
 
 export interface InvoicePage {
@@ -40,17 +49,20 @@ export interface InvoicePage {
 /**
  * Split invoice items into pages for multi-page rendering
  *
- * Optimized for A4: 15-20 items per page for better space usage
- * This accounts for header, company info, totals, and footer space
- *
- * The key insight: The last page needs space for totals section, so it should have fewer items
+ * Smart pagination that accounts for different page layouts:
+ * - First page: Has header + payment tracking, needs more space
+ * - Middle pages: Full content pages with just items
+ * - Last page: Has totals + footer, needs space for them
  */
 export function paginateInvoiceItems(
   items: InvoiceItem[],
   config: PageConfig = {}
 ): InvoicePage[] {
   const {
-    itemsPerPage = 18, // Optimized for A4 invoices (better space usage)
+    itemsPerPage,
+    firstPageCapacity = 0.85,
+    lastPageCapacity = 0.75,
+    templateType = 'standard'
   } = config;
 
   if (items.length === 0) {
@@ -65,63 +77,105 @@ export function paginateInvoiceItems(
     }];
   }
 
-  // Calculate how many items can fit on each page
-  // Last page needs extra space for totals section (~80mm)
-  const regularPageItems = itemsPerPage; // Full pages can have max items
-  const lastPageItems = Math.max(1, 5); // Last page should have 5 items max for totals
+  // Calculate dynamic items per page if not provided
+  const dynamicItemsPerPage = itemsPerPage || calculateDynamicItemsPerPage(items, templateType);
+  
+  // Get dynamic capacities based on template type
+  const dynamicCapacities = getDynamicPageCapacities(templateType);
+  const finalFirstPageCapacity = firstPageCapacity !== 0.85 ? firstPageCapacity : dynamicCapacities.firstPageCapacity;
+  const finalLastPageCapacity = lastPageCapacity !== 0.75 ? lastPageCapacity : dynamicCapacities.lastPageCapacity;
 
-  // If we have very few items, just put them on one page
-  if (items.length <= regularPageItems) {
-    return [{
-      pageNumber: 1,
-      totalPages: 1,
-      items: [...items],
-      isFirstPage: true,
-      isLastPage: true,
-      itemsRange: { start: 1, end: items.length }
-    }];
+  // Define capacity for different page types using dynamic values
+  const firstPageItems = Math.floor(dynamicItemsPerPage * finalFirstPageCapacity);
+  const middlePageItems = dynamicItemsPerPage; // Full capacity for middle pages
+  const lastPageItems = Math.floor(dynamicItemsPerPage * finalLastPageCapacity);
+
+  // If items fit on one page (single page case)
+  if (items.length <= firstPageItems + lastPageItems) {
+    // Try to fit everything on first page if possible
+    if (items.length <= firstPageItems) {
+      return [{
+        pageNumber: 1,
+        totalPages: 1,
+        items: [...items],
+        isFirstPage: true,
+        isLastPage: true,
+        itemsRange: { start: 1, end: items.length }
+      }];
+    }
+    
+    // Split between first and last page
+    const firstPageItemsCount = firstPageItems;
+    
+    return [
+      {
+        pageNumber: 1,
+        totalPages: 2,
+        items: items.slice(0, firstPageItemsCount),
+        isFirstPage: true,
+        isLastPage: false,
+        itemsRange: { start: 1, end: firstPageItemsCount }
+      },
+      {
+        pageNumber: 2,
+        totalPages: 2,
+        items: items.slice(firstPageItemsCount),
+        isFirstPage: false,
+        isLastPage: true,
+        itemsRange: { start: firstPageItemsCount + 1, end: items.length }
+      }
+    ];
   }
 
-  // Calculate how many pages we need
-  const itemsWithoutLastPage = items.length - lastPageItems;
-  const regularPages = Math.ceil(itemsWithoutLastPage / regularPageItems);
-  const totalPages = regularPages + 1;
-
+  // Multi-page case: Calculate pages needed
   const pages: InvoicePage[] = [];
+  let remainingItems = items.length;
+  let itemIndex = 0;
 
-  // Fill regular pages (all except last)
-  for (let pageNum = 1; pageNum <= regularPages; pageNum++) {
-    const startIdx = (pageNum - 1) * regularPageItems;
-    const endIdx = Math.min(startIdx + regularPageItems, items.length - lastPageItems);
-    const pageItems = items.slice(startIdx, endIdx);
+  // First page (with header and payment tracking)
+  const firstPageCount = Math.min(firstPageItems, remainingItems);
+  pages.push({
+    pageNumber: 1,
+    totalPages: 0, // Will be calculated later
+    items: items.slice(itemIndex, itemIndex + firstPageCount),
+    isFirstPage: true,
+    isLastPage: false,
+    itemsRange: { start: 1, end: firstPageCount }
+  });
+  itemIndex += firstPageCount;
+  remainingItems -= firstPageCount;
 
+  // Middle pages (full capacity)
+  while (remainingItems > lastPageItems) {
+    const middlePageCount = Math.min(middlePageItems, remainingItems);
     pages.push({
-      pageNumber: pageNum,
-      totalPages,
-      items: pageItems,
-      isFirstPage: pageNum === 1,
+      pageNumber: pages.length + 1,
+      totalPages: 0, // Will be calculated later
+      items: items.slice(itemIndex, itemIndex + middlePageCount),
+      isFirstPage: false,
       isLastPage: false,
-      itemsRange: {
-        start: startIdx + 1,
-        end: endIdx
-      }
+      itemsRange: { start: itemIndex + 1, end: itemIndex + middlePageCount }
+    });
+    itemIndex += middlePageCount;
+    remainingItems -= middlePageCount;
+  }
+
+  // Last page (with totals and footer)
+  if (remainingItems > 0) {
+    pages.push({
+      pageNumber: pages.length + 1,
+      totalPages: 0, // Will be calculated later
+      items: items.slice(itemIndex),
+      isFirstPage: false,
+      isLastPage: true,
+      itemsRange: { start: itemIndex + 1, end: items.length }
     });
   }
 
-  // Add the last page with remaining items (fewer items to make room for totals)
-  const lastPageStartIdx = items.length - lastPageItems;
-  const lastPageItemsSlice = items.slice(lastPageStartIdx);
-
-  pages.push({
-    pageNumber: totalPages,
-    totalPages,
-    items: lastPageItemsSlice,
-    isFirstPage: false,
-    isLastPage: true,
-    itemsRange: {
-      start: lastPageStartIdx + 1,
-      end: items.length
-    }
+  // Update total pages count
+  const totalPages = pages.length;
+  pages.forEach(page => {
+    page.totalPages = totalPages;
   });
 
   return pages;
@@ -135,17 +189,93 @@ export function isMultiPageInvoice(itemCount: number, itemsPerPage: number = 12)
 }
 
 /**
+ * Determine if a separate totals page is needed based on pagination results
+ */
+export function needsSeparateTotalsPage(
+  pages: InvoicePage[], 
+  threshold?: number,
+  templateType: 'compact' | 'standard' | 'detailed' = 'standard'
+): boolean {
+  if (pages.length === 0) return false;
+  
+  const lastPage = pages[pages.length - 1];
+  const dynamicCapacities = getDynamicPageCapacities(templateType);
+  const finalThreshold = threshold || dynamicCapacities.separateTotalsThreshold;
+  
+  return lastPage.items.length > finalThreshold;
+}
+
+/**
  * Get recommended items per page based on template type
  */
 export function getRecommendedItemsPerPage(templateType: 'compact' | 'standard' | 'detailed'): number {
   switch (templateType) {
     case 'compact':
-      return 8;  // More items, less spacing
+      return 25;  // More items, less spacing
     case 'detailed':
-      return 4;  // Fewer items, more details/spacing
+      return 15;  // Fewer items, more details/spacing
     case 'standard':
     default:
-      return 6;  // Conservative - fits nicely on A4
+      return 20;  // Conservative - fits nicely on A4
+  }
+}
+
+/**
+ * Calculate dynamic items per page based on content complexity
+ */
+export function calculateDynamicItemsPerPage(
+  items: InvoiceItem[], 
+  templateType: 'compact' | 'standard' | 'detailed' = 'standard'
+): number {
+  if (items.length === 0) return 20;
+  
+  // Base capacity by template type
+  const baseCapacity = getRecommendedItemsPerPage(templateType);
+  
+  // Analyze content complexity
+  const avgDescriptionLength = items.reduce((sum, item) => 
+    sum + item.description.length + (item.itemDescription?.length || 0), 0
+  ) / items.length;
+  
+  // Adjust capacity based on content complexity
+  let complexityMultiplier = 1;
+  if (avgDescriptionLength > 100) {
+    complexityMultiplier = 0.7; // Reduce capacity for long descriptions
+  } else if (avgDescriptionLength > 50) {
+    complexityMultiplier = 0.85;
+  }
+  
+  return Math.floor(baseCapacity * complexityMultiplier);
+}
+
+/**
+ * Get dynamic page capacity multipliers based on template characteristics
+ */
+export function getDynamicPageCapacities(templateType: 'compact' | 'standard' | 'detailed'): {
+  firstPageCapacity: number;
+  lastPageCapacity: number;
+  separateTotalsThreshold: number;
+} {
+  switch (templateType) {
+    case 'compact':
+      return {
+        firstPageCapacity: 0.9,  // Less header space needed
+        lastPageCapacity: 0.85,  // Less footer space needed
+        separateTotalsThreshold: 10
+      };
+    case 'detailed':
+      return {
+        firstPageCapacity: 0.8,  // More header space needed
+        lastPageCapacity: 0.7,   // More footer space needed
+        separateTotalsThreshold: 6
+      };
+    case 'standard':
+    default:
+      return {
+        firstPageCapacity: 0.85, // Standard header space
+        lastPageCapacity: 0.75,  // Standard footer space
+        separateTotalsThreshold: 8
+      };
   }
 }
 

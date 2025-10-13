@@ -76,7 +76,7 @@ export function Modal({
       {/* Modal */}
       <div 
         className={cn(
-          "relative w-full rounded-xl shadow-2xl transform transition-all",
+          "relative w-full rounded-xl transform transition-all",
           "animate-in fade-in-0 zoom-in-95 duration-200",
           sizeStyles[size],
           className

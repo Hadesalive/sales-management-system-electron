@@ -29,7 +29,7 @@ export function CustomerList({
 
   return (
     <div 
-      className={cn("rounded-xl shadow-sm", className)}
+      className={cn("rounded-xl", className)}
       style={{ 
         background: 'var(--card)', 
         border: '1px solid var(--border)' 
@@ -58,7 +58,7 @@ export function CustomerList({
           {customers.map((customer) => (
             <div
               key={customer.id}
-              className="p-4 rounded-lg border cursor-pointer hover:shadow-sm transition-all"
+              className="p-4 rounded-lg border cursor-pointer transition-all"
               style={{ 
                 backgroundColor: 'var(--background)',
                 borderColor: 'var(--border)'

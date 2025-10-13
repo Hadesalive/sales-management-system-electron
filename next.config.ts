@@ -7,9 +7,11 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true
   },
+  // Fix asset loading in Electron
   assetPrefix: process.env.NODE_ENV === 'production' ? './' : '',
   basePath: '',
   distDir: 'out',
+  // Ensure proper static asset handling
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Include database files in server build

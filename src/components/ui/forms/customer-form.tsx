@@ -173,7 +173,7 @@ export function CustomerForm({
   return (
     <div className="fixed inset-0 backdrop-blur-sm bg-white/20 dark:bg-black/20 flex items-center justify-center p-4 z-50">
       <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         style={{ backgroundColor: 'var(--card)' }}
       >
         <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--border)' }}>

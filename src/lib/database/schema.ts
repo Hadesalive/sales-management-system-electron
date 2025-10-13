@@ -125,6 +125,7 @@ export const InvoiceTemplateSchema = z.object({
 export const InvoiceItemSchema = z.object({
   id: z.string().uuid(),
   description: z.string().min(1),
+  itemDescription: z.string().optional(),
   quantity: z.number().int().positive(),
   rate: z.number().positive(),
   amount: z.number().positive(),
@@ -162,10 +163,54 @@ export const InvoiceSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
+export const DealSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1),
+  customerId: z.string().uuid().optional(),
+  customerName: z.string().optional(),
+  value: z.number().positive(),
+  probability: z.number().int().min(0).max(100),
+  stage: z.enum(['lead', 'qualified', 'proposal', 'negotiation', 'closed-won', 'closed-lost']),
+  expectedCloseDate: z.string().datetime().optional(),
+  actualCloseDate: z.string().datetime().optional(),
+  source: z.string().optional(),
+  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+  tags: z.array(z.string()).default([]),
+  notes: z.string().optional(),
+  negotiationHistory: z.array(z.object({
+    id: z.string().uuid(),
+    date: z.string().datetime(),
+    type: z.enum(['meeting', 'call', 'email', 'proposal', 'counter-offer', 'concession']),
+    description: z.string(),
+    outcome: z.string().optional(),
+    nextSteps: z.string().optional(),
+    attachments: z.array(z.string()).default([])
+  })).default([]),
+  stakeholders: z.array(z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    role: z.string(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
+    influence: z.enum(['low', 'medium', 'high']),
+    sentiment: z.enum(['positive', 'neutral', 'negative']),
+    notes: z.string().optional()
+  })).default([]),
+  competitorInfo: z.object({
+    competitors: z.array(z.string()).default([]),
+    ourAdvantages: z.array(z.string()).default([]),
+    theirAdvantages: z.array(z.string()).default([]),
+    priceComparison: z.string().optional()
+  }).optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
 // TypeScript types derived from schemas
 export type InvoiceTemplate = z.infer<typeof InvoiceTemplateSchema>;
 export type InvoiceItem = z.infer<typeof InvoiceItemSchema>;
 export type Invoice = z.infer<typeof InvoiceSchema>;
+export type Deal = z.infer<typeof DealSchema>;
 
 export interface DatabaseInvoiceTemplate extends Omit<InvoiceTemplate, 'id' | 'createdAt' | 'updatedAt' | 'colors' | 'fonts' | 'layout' | 'customSchema'> {
   id?: string;
@@ -204,4 +249,18 @@ export interface DatabaseInvoice extends Omit<Invoice, 'id' | 'createdAt' | 'upd
 
 export interface DatabaseInvoiceItem extends InvoiceItem {
   invoice_id?: string;
+}
+
+export interface DatabaseDeal extends Omit<Deal, 'id' | 'createdAt' | 'updatedAt' | 'customerId' | 'customerName' | 'expectedCloseDate' | 'actualCloseDate' | 'negotiationHistory' | 'stakeholders' | 'competitorInfo' | 'tags'> {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  customer_id?: string;
+  customer_name?: string;
+  expected_close_date?: string;
+  actual_close_date?: string;
+  negotiation_history?: string; // JSON string
+  stakeholders?: string; // JSON string
+  competitor_info?: string; // JSON string
+  tags?: string; // JSON string
 }

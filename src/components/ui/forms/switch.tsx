@@ -62,7 +62,7 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
             >
               <span
                 className={cn(
-                  "inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 ease-in-out",
+                  "inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out",
                   isChecked ? "translate-x-6" : "translate-x-1"
                 )}
               />

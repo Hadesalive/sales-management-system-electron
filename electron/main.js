@@ -18,7 +18,7 @@ let databaseService;
 function initializeApp() {
   // Initialize database service
   databaseService = initializeDatabaseService();
-  
+
   // Register all IPC handlers
   registerAllHandlers(databaseService);
 }
@@ -32,13 +32,13 @@ function setupApp() {
     .catch((error) => {
       console.error('Failed to initialize database:', error);
     });
-  
+
   // Create main window
   mainWindow = createMainWindow();
-  
+
   // Create application menu
   createApplicationMenu(mainWindow);
-  
+
   // Handle window closed
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -56,7 +56,7 @@ app.on('window-all-closed', () => {
   if (databaseService) {
     databaseService.close();
   }
-  
+
   if (process.platform !== 'darwin') {
     app.quit();
   }

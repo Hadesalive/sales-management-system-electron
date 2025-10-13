@@ -52,20 +52,63 @@ interface InvoiceData {
 }
 
 async function getInvoiceData(id: string): Promise<InvoiceData> {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const response = await fetch(`${baseUrl}/api/invoices/${id}`, {
-    cache: 'no-store'
-  });
+  // Use Electron IPC to get invoice data
+  if (!window.electron?.ipcRenderer) {
+    throw new Error('Electron not available');
+  }
+  
+  const result = await window.electron.ipcRenderer.invoke('get-invoice-by-id', id) as {
+    success: boolean;
+    data?: unknown;
+    error?: string;
+  };
 
-  if (!response.ok) {
-    throw new Error('Invoice not found');
+  if (!result.success || !result.data) {
+    throw new Error(result.error || 'Invoice not found');
   }
 
-  const invoiceData = await response.json();
+  const invoiceData = result.data as {
+    id: string;
+    number: string;
+    customerId?: string;
+    customerName: string;
+    customerEmail: string;
+    customerAddress: string;
+    customerPhone: string;
+    issueDate: string;
+    dueDate: string;
+    invoiceType: "invoice" | "proforma" | "quote" | "credit_note" | "debit_note";
+    currency: string;
+    subtotal: number;
+    tax: number;
+    discount: number;
+    total: number;
+    paidAmount: number;
+    balance: number;
+    status: "draft" | "pending" | "sent" | "paid" | "overdue" | "cancelled";
+    items: Array<{
+      id: string;
+      description: string;
+      quantity: number;
+      rate: number;
+      amount: number;
+    }>;
+    notes?: string;
+    terms?: string;
+    bankDetails?: {
+      bankName: string;
+      accountName?: string;
+      accountNumber: string;
+      routingNumber?: string;
+      swiftCode?: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+  };
 
   return {
     invoiceNumber: invoiceData.number,
-    date: invoiceData.issueDate,
+    date: invoiceData.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
     dueDate: invoiceData.dueDate,
     invoiceType: invoiceData.invoiceType || 'invoice',
     currency: invoiceData.currency || 'USD',

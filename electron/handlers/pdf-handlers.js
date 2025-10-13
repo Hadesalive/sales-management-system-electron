@@ -102,6 +102,7 @@ function setupPdfHandlers() {
         format: 'A4',
         printBackground: true,
         preferCSSPageSize: false,
+        // Zero margins - templates have internal padding
         margin: {
           top: '0mm',
           right: '0mm',

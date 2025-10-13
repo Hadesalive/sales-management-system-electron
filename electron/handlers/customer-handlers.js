@@ -21,9 +21,10 @@ function registerCustomerHandlers(databaseService) {
     }
   });
 
-  ipcMain.handle('update-customer', async (event, customerId, customerData) => {
+  ipcMain.handle('update-customer', async (event, payload) => {
     try {
-      const customer = await databaseService.updateCustomer(customerId, customerData);
+      const { id, updates } = payload;
+      const customer = await databaseService.updateCustomer(id, updates);
       return { success: true, data: customer };
     } catch (error) {
       return { success: false, error: error.message };

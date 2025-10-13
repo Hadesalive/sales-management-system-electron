@@ -64,12 +64,11 @@ export function CustomerProfileCard({
   return (
     <div 
       className={cn(
-        "rounded-2xl p-6 transition-all duration-300 hover:shadow-2xl backdrop-blur-xl flex flex-col h-full",
+        "rounded-2xl p-6 transition-all duration-300 backdrop-blur-xl flex flex-col h-full",
         className
       )}
       style={{ 
-        background: "rgba(255, 255, 255, 0.8)",
-        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+        background: "rgba(255, 255, 255, 0.8)"
       }}
     >
       {/* Header with Avatar and Actions */}

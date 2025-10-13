@@ -38,7 +38,7 @@ export function ListCard({ title, items, className = "", headerActions, itemsPer
   };
   
   return (
-    <div className={cn("rounded-xl shadow-sm", className)} style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+    <div className={cn("rounded-xl", className)} style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
       <div className="p-5 pb-3">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{title}</h3>

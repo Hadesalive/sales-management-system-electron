@@ -103,12 +103,58 @@ export default function EditInvoicePage() {
     try {
       setLoading(true);
       
-      const response = await fetch(`/api/invoices/${invoiceId}`);
-      if (!response.ok) {
-        throw new Error('Failed to load invoice');
+      if (!window.electron?.ipcRenderer) {
+        throw new Error('Electron not available');
       }
       
-      const invoice = await response.json();
+      const result = await window.electron.ipcRenderer.invoke('get-invoice-by-id', invoiceId) as {
+        success: boolean;
+        data?: unknown;
+        error?: string;
+      };
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to load invoice');
+      }
+      
+      const invoice = result.data as {
+        id: string;
+        number: string;
+        customerId?: string;
+        customerName: string;
+        customerEmail: string;
+        customerAddress: string;
+        customerPhone: string;
+        issueDate: string;
+        dueDate: string;
+        invoiceType: "invoice" | "proforma" | "quote" | "credit_note" | "debit_note";
+        currency: string;
+        subtotal: number;
+        tax: number;
+        discount: number;
+        total: number;
+        paidAmount: number;
+        balance: number;
+        status: "draft" | "pending" | "sent" | "paid" | "overdue" | "cancelled";
+        items: Array<{
+          id: string;
+          description: string;
+          quantity: number;
+          rate: number;
+          amount: number;
+        }>;
+        notes?: string;
+        terms?: string;
+        bankDetails?: {
+          bankName: string;
+          accountName?: string;
+          accountNumber: string;
+          routingNumber?: string;
+          swiftCode?: string;
+        };
+        createdAt: string;
+        updatedAt: string;
+      };
       
       // Transform API data to InvoiceBuilder format
       const customerAddressParts = (invoice.customerAddress || '').split(',').map((s: string) => s.trim());
@@ -120,10 +166,10 @@ export default function EditInvoicePage() {
         company: {
           name: "TopNotch Electronics",
           address: "123 Business St",
-          city: "San Francisco",
-          state: "CA",
+          city: "Freetown",
+          state: "Western Area Urban, BO etc",
           zip: "94105",
-          phone: "+1 (555) 123-4567",
+          phone: "+232 74 123-4567",
           email: "info@topnotch.com",
           website: "",
           logo: ""
@@ -226,16 +272,21 @@ export default function EditInvoicePage() {
         terms: updatedInvoiceData.terms || '',
       };
 
-      const response = await fetch(`/api/invoices/${invoiceId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
+      if (!window.electron?.ipcRenderer) {
+        throw new Error('Electron not available');
+      }
+      
+      const result = await window.electron.ipcRenderer.invoke('update-invoice', {
+        id: invoiceId,
+        body: requestBody
+      }) as {
+        success: boolean;
+        data?: unknown;
+        error?: string;
+      };
 
-      if (!response.ok) {
-        throw new Error('Failed to update invoice');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update invoice');
       }
       
       setToast({ message: 'Invoice updated successfully!', type: 'success' });
@@ -252,42 +303,7 @@ export default function EditInvoicePage() {
     }
   };
 
-  const handlePreview = (invoiceData: {
-    invoiceNumber?: string;
-    date?: string;
-    dueDate?: string;
-    company?: {
-      name?: string;
-      address?: string;
-      city?: string;
-      state?: string;
-      zip?: string;
-      phone?: string;
-      email?: string;
-      website?: string;
-    };
-    customer?: {
-      name?: string;
-      email?: string;
-      address?: string;
-      city?: string;
-      state?: string;
-      zip?: string;
-      phone?: string;
-    };
-    items?: Array<{
-      id?: string;
-      description?: string;
-      quantity?: number;
-      rate?: number;
-      amount?: number;
-    }>;
-    notes?: string;
-    terms?: string;
-    taxRate?: number;
-    discount?: number;
-  }) => {
-    console.log('Preview invoice:', invoiceData);
+  const handlePreview = () => {
     setToast({ message: 'Invoice preview updated', type: 'success' });
   };
 

@@ -201,3 +201,78 @@ body {
   background-color: var(--accent) !important;
   border-color: var(--accent) !important;
 }
+
+/* Print styles for proper border rendering and safe margins */
+@media print {
+  /* Zero page margins - clean print */
+  @page {
+    size: A4;
+    margin: 0; /* No CSS margins - templates have internal padding */
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure borders are visible when printing */
+  .border,
+  [class*="border-"],
+  [style*="border"] {
+    border-style: solid !important;
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Force border colors to print */
+  .border-gray-200,
+  [style*="borderColor"] {
+    border-color: #e5e7eb !important;
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure background colors print */
+  .bg-white,
+  [style*="backgroundColor"] {
+    background-color: white !important;
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Remove shadows for cleaner print */
+  .shadow-sm,
+  .shadow,
+  .shadow-lg,
+  [style*="box-shadow"] {
+    box-shadow: none !important;
+  }
+  
+  /* Ensure table borders print */
+  table {
+    border-collapse: collapse !important;
+  }
+  
+  th, td {
+    border: 1px solid #e5e7eb !important;
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure rounded corners don't interfere with printing */
+  .rounded-lg,
+  .rounded,
+  [style*="border-radius"] {
+    border-radius: 0 !important;
+  }
+  
+  /* Remove external margins from invoice containers - @page handles this */
+  .print-invoice {
+    margin: 0 !important;
+  }
+}

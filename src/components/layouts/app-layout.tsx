@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   DashboardLayout, 
   DashboardHeader, 
@@ -19,6 +19,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [pageTitle, setPageTitle] = useState('TopNotch Sales Manager');
   const pathname = usePathname();
+  const router = useRouter();
   
   // Apply dark mode from settings
   useDarkMode();
@@ -27,13 +28,13 @@ function AppLayoutContent({ children }: AppLayoutProps) {
   const getCurrentPageTitle = useCallback(() => {
     if (pathname === '/') return 'Overview';
     if (pathname.startsWith('/sales')) return 'Sales';
-    if (pathname.startsWith('/pipeline')) return 'Sales Pipeline';
+    // if (pathname.startsWith('/pipeline')) return 'Sales Pipeline'; // Commented out
     if (pathname.startsWith('/invoices')) return 'Invoices';
     if (pathname.startsWith('/orders')) return 'Orders';
     if (pathname.startsWith('/products')) return 'Products';
     if (pathname.startsWith('/customers')) return 'Customers';
     if (pathname.startsWith('/inventory')) return 'Inventory';
-    if (pathname.startsWith('/shipping')) return 'Shipping';
+    // if (pathname.startsWith('/shipping')) return 'Shipping'; // Commented out
     if (pathname.startsWith('/returns')) return 'Returns';
     if (pathname.startsWith('/reports')) return 'Reports';
     if (pathname.startsWith('/settings')) {
@@ -52,13 +53,13 @@ function AppLayoutContent({ children }: AppLayoutProps) {
     const routeMap: Record<string, string> = {
       'Overview': '/',
       'Sales': '/sales',
-      'Pipeline': '/pipeline',
+      // 'Pipeline': '/pipeline', // Commented out
       'Invoices': '/invoices',
       'Orders': '/orders',
       'Products': '/products',
       'Customers': '/customers',
       'Inventory': '/inventory',
-      'Shipping': '/shipping',
+      // 'Shipping': '/shipping', // Commented out
       'Returns': '/returns',
       'Reports': '/reports',
       'Settings': '/settings',
@@ -71,7 +72,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
 
     const route = routeMap[name];
     if (route && route !== pathname) {
-      window.location.href = route;
+      router.push(route);
     }
     setIsMobileMenuOpen(false);
   };
@@ -121,18 +122,19 @@ function AppLayoutContent({ children }: AppLayoutProps) {
       );
     }
     
-    if (pathname === '/pipeline') {
-      return (
-        <>
-          <button 
-            className="btn btn-ghost"
-            onClick={() => console.log('Add new deal')}
-          >
-            New Deal
-          </button>
-        </>
-      );
-    }
+    // Pipeline header actions commented out
+    // if (pathname === '/pipeline') {
+    //   return (
+    //     <>
+    //       <button 
+    //         className="btn btn-ghost"
+    //         onClick={() => router.push('/pipeline/deals/new')}
+    //       >
+    //         New Deal
+    //       </button>
+    //     </>
+    //   );
+    // }
     
     if (pathname === '/customers') {
       return (

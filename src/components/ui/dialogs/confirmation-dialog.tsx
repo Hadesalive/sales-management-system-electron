@@ -72,7 +72,7 @@ export function ConfirmationDialog({
       
       {/* Dialog */}
       <div 
-        className={`relative rounded-lg shadow-xl max-w-md w-full mx-4 border ${styles.border}`}
+        className={`relative rounded-lg max-w-md w-full mx-4 border ${styles.border}`}
         style={{ backgroundColor: 'var(--card)' }}
       >
         <div className="p-6">

@@ -13,6 +13,7 @@ export interface Customer extends BaseEntity {
   company?: string;
   notes?: string;
   isActive?: boolean;
+  storeCredit?: number; // Customer store credit balance
   avatar?: string; // Base64 encoded image or URL
 }
 
@@ -37,6 +38,15 @@ export interface SaleItem {
   total: number;
 }
 
+export interface InvoiceItem {
+  id: string;
+  description: string;
+  itemDescription?: string; // Additional item-specific description
+  quantity: number;
+  rate: number;
+  amount: number;
+}
+
 export interface Sale extends BaseEntity {
   customerId?: string;
   customerName?: string;
@@ -48,6 +58,59 @@ export interface Sale extends BaseEntity {
   status: 'pending' | 'completed' | 'cancelled' | 'refunded';
   paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'other';
   notes?: string;
+  invoiceId?: string; // Reference to created invoice
+  invoiceNumber?: string; // Invoice number for quick reference
+}
+
+export interface OrderItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Order extends BaseEntity {
+  supplierId?: string;
+  supplierName: string;
+  items: OrderItem[];
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+  orderNumber: string;
+  expectedDeliveryDate?: string;
+  actualDeliveryDate?: string;
+  paymentStatus: 'unpaid' | 'partial' | 'paid';
+  paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'credit' | 'other';
+  notes?: string;
+}
+
+export interface ReturnItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  reason: string;
+  condition: 'unopened' | 'opened' | 'defective' | 'damaged';
+}
+
+export interface Return extends BaseEntity {
+  saleId?: string;
+  customerId?: string;
+  customerName?: string;
+  items: ReturnItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  refundAmount: number;
+  refundMethod: 'cash' | 'store_credit' | 'original_payment' | 'exchange';
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  returnNumber: string;
+  notes?: string;
+  processedBy?: string;
 }
 
 export interface CompanySettings {

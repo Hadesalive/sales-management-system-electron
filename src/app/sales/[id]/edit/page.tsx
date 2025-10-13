@@ -16,7 +16,8 @@ import {
   CurrencyDollarIcon,
   ReceiptPercentIcon,
   PlusIcon,
-  TrashIcon
+  TrashIcon,
+  PrinterIcon
 } from '@heroicons/react/24/outline';
 
 export default function EditSalePage() {
@@ -100,12 +101,15 @@ export default function EditSalePage() {
       return;
     }
     
+    // Ensure saleItems is an array
+    const currentSaleItems = saleItems || [];
+    
     // Check if product already exists in cart
-    const existingItemIndex = saleItems.findIndex(item => item.productId === selectedProduct);
+    const existingItemIndex = currentSaleItems.findIndex(item => item.productId === selectedProduct);
     
     if (existingItemIndex >= 0) {
       // Update existing item
-      const updatedItems = [...saleItems];
+      const updatedItems = [...currentSaleItems];
       updatedItems[existingItemIndex].quantity += quantity;
       updatedItems[existingItemIndex].total = updatedItems[existingItemIndex].quantity * updatedItems[existingItemIndex].unitPrice;
       setSaleItems(updatedItems);
@@ -120,7 +124,7 @@ export default function EditSalePage() {
         total: quantity * unitPrice,
       };
       
-      setSaleItems([...saleItems, newItem]);
+      setSaleItems([...currentSaleItems, newItem]);
     }
     
     // Reset form
@@ -143,21 +147,190 @@ export default function EditSalePage() {
   };
 
   const removeItem = (index: number) => {
-    setSaleItems(saleItems.filter((_, i) => i !== index));
+    const currentSaleItems = saleItems || [];
+    setSaleItems(currentSaleItems.filter((_, i) => i !== index));
   };
 
   const calculateTotals = () => {
-    const subtotal = saleItems.reduce((sum, item) => sum + item.total, 0);
+    const currentSaleItems = saleItems || [];
+    const subtotal = currentSaleItems.reduce((sum, item) => sum + item.total, 0);
     const tax = subtotal * 0.15; // 15% tax rate
     const total = subtotal + tax;
     
     return { subtotal, tax, total };
   };
 
+  // Prepare receipt data
+  const getReceiptData = () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { tax, total } = calculateTotals();
+    const selectedCustomerData = customers.find(c => c.id === selectedCustomer);
+    const now = new Date();
+    
+    return {
+      receiptNumber: `RCP-${Date.now().toString().slice(-6)}`,
+      date: now.toISOString().split('T')[0],
+      time: now.toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }),
+      company: {
+        name: "TopNotch Electronics",
+        address: "Pultney Street",
+        city: "Freetown",
+        state: "Western Area Urban, BO etc",
+        zip: "94105",
+        phone: "+232 74 123-4567",
+        email: "info@topnotch.com",
+        logo: "/Assets/topnotch-logo-dark.png"
+      },
+      customer: {
+        name: selectedCustomerData?.name || 'Walk-in Customer',
+        email: selectedCustomerData?.email || '',
+        phone: selectedCustomerData?.phone || ''
+      },
+      items: saleItems.map(item => ({
+        id: item.productId,
+        description: item.productName,
+        quantity: item.quantity,
+        rate: item.unitPrice,
+        amount: item.total
+      })),
+      paymentMethod: paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1).replace('_', ' '),
+      taxRate: 15,
+      discount: 0
+    };
+  };
+
+  // Print receipt
+  const handlePrintReceipt = () => {
+    if (saleItems.length === 0) {
+      setToast({ message: 'Please add at least one item to print receipt', type: 'error' });
+      return;
+    }
+    
+    // Create a new window with the receipt preview
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (printWindow) {
+      const receiptData = getReceiptData();
+      
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Receipt Print</title>
+          <style>
+            body { margin: 0; padding: 20px; font-family: monospace; }
+            .receipt { max-width: 300px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .company-name { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+            .company-details { font-size: 12px; line-height: 1.4; }
+            .receipt-title { text-align: center; font-size: 16px; font-weight: bold; margin: 20px 0; }
+            .receipt-info { text-align: center; font-size: 12px; margin-bottom: 20px; }
+            .customer-section { margin-bottom: 20px; }
+            .customer-title { font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+            .customer-details { font-size: 12px; }
+            .items-section { margin-bottom: 20px; }
+            .item-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
+            .item { margin-bottom: 10px; font-size: 12px; }
+            .item-description { margin-bottom: 3px; }
+            .item-details { font-size: 10px; color: #666; }
+            .totals { margin-bottom: 20px; }
+            .total-line { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+            .total-final { font-size: 14px; font-weight: bold; border-top: 1px solid #000; padding-top: 5px; }
+            .payment-method { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 20px; }
+            .footer { text-align: center; font-size: 10px; line-height: 1.4; }
+            @media print { body { margin: 0; padding: 10px; } }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            <div class="header">
+              <div class="company-name">${receiptData.company.name}</div>
+              <div class="company-details">
+                ${receiptData.company.address}<br>
+                ${receiptData.company.city}, ${receiptData.company.state} ${receiptData.company.zip}<br>
+                ${receiptData.company.phone}
+              </div>
+            </div>
+            
+            <div class="receipt-title">RECEIPT</div>
+            
+            <div class="receipt-info">
+              <div><strong>Receipt #:</strong> ${receiptData.receiptNumber}</div>
+              <div><strong>Date:</strong> ${receiptData.date}</div>
+              <div><strong>Time:</strong> ${receiptData.time}</div>
+            </div>
+            
+            <div class="customer-section">
+              <div class="customer-title">Customer:</div>
+              <div class="customer-details">
+                ${receiptData.customer.name}<br>
+                ${receiptData.customer.email ? receiptData.customer.email + '<br>' : ''}
+                ${receiptData.customer.phone || ''}
+              </div>
+            </div>
+            
+            <div class="items-section">
+              <div class="item-header">
+                <span>Item</span>
+                <span>Total</span>
+              </div>
+              ${receiptData.items.map(item => `
+                <div class="item">
+                  <div class="item-description">${item.description}</div>
+                  <div class="item-details">${item.quantity} × ${formatCurrency(item.rate)}</div>
+                </div>
+                <div style="text-align: right; font-weight: bold;">${formatCurrency(item.amount)}</div>
+              `).join('')}
+            </div>
+            
+            <div class="totals">
+              <div class="total-line">
+                <span>Subtotal:</span>
+                <span>${formatCurrency(receiptData.items.reduce((sum, item) => sum + item.amount, 0))}</span>
+              </div>
+              <div class="total-line">
+                <span>Tax (15%):</span>
+                <span>${formatCurrency(tax)}</span>
+              </div>
+              <div class="total-line total-final">
+                <span>Total:</span>
+                <span>${formatCurrency(total)}</span>
+              </div>
+            </div>
+            
+            <div class="payment-method">
+              <span>Payment Method:</span>
+              <span>${receiptData.paymentMethod}</span>
+            </div>
+            
+            <div class="footer">
+              <div>Thank you for your business!</div>
+              <div>Keep this receipt for your records</div>
+              <div>Questions? Contact us at ${receiptData.company.email}</div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      printWindow.focus();
+      
+      // Auto-print after a short delay
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (saleItems.length === 0) {
+    const currentSaleItems = saleItems || [];
+    if (currentSaleItems.length === 0) {
       setToast({ message: 'Please add at least one item to the sale', type: 'error' });
       return;
     }
@@ -171,7 +344,7 @@ export default function EditSalePage() {
       const saleData = {
         customerId: selectedCustomer || undefined,
         customerName: selectedCustomerData?.name || 'Walk-in Customer',
-        items: saleItems,
+        items: currentSaleItems,
         subtotal,
         tax,
         discount: originalSale?.discount || 0,
@@ -189,7 +362,14 @@ export default function EditSalePage() {
           router.push(`/sales/${saleId}`);
         }, 1000);
       } else {
-        setToast({ message: response.error || 'Failed to update sale', type: 'error' });
+        // Handle stock validation errors with details
+        if (response.error === 'Stock validation failed' && (response as { details?: string[] }).details) {
+          const details = (response as unknown as { details: string[] }).details;
+          const errorMessage = details.join('\n');
+          setToast({ message: errorMessage, type: 'error' });
+        } else {
+          setToast({ message: response.error || 'Failed to update sale', type: 'error' });
+        }
       }
     } catch (error) {
       console.error('Error updating sale:', error);
@@ -281,10 +461,16 @@ export default function EditSalePage() {
                   ]}
                 />
                 
-                {selectedCustomer && (
+                {selectedCustomer ? (
                   <div className="mt-3 p-3 bg-blue-50 rounded-lg">
                     <p className="text-sm text-blue-800">
                       Customer selected: {customers.find(c => c.id === selectedCustomer)?.name}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">
+                      Walk-in Customer - No customer account required
                     </p>
                   </div>
                 )}
@@ -395,7 +581,7 @@ export default function EditSalePage() {
               </div>
 
               {/* Sale Items */}
-              {saleItems.length > 0 && (
+              {(saleItems || []).length > 0 && (
                 <div 
                   className="p-6 rounded-lg border"
                   style={{ 
@@ -404,11 +590,11 @@ export default function EditSalePage() {
                   }}
                 >
                   <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
-                    Sale Items ({saleItems.length})
+                    Sale Items ({(saleItems || []).length})
                   </h2>
                   
                   <div className="space-y-3">
-                    {saleItems.map((item, index) => (
+                    {(saleItems || []).map((item, index) => (
                       <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border rounded-lg" style={{ borderColor: 'var(--border)' }}>
                         <div className="md:col-span-2">
                           <p className="font-medium" style={{ color: 'var(--foreground)' }}>
@@ -562,6 +748,16 @@ export default function EditSalePage() {
                 <Button
                   type="button"
                   variant="outline"
+                  onClick={handlePrintReceipt}
+                  disabled={(saleItems || []).length === 0}
+                  className="w-full"
+                >
+                  <PrinterIcon className="h-4 w-4 mr-2" />
+                  Print Receipt
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => router.push(`/sales/${saleId}`)}
                   className="w-full"
                 >
@@ -569,7 +765,7 @@ export default function EditSalePage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={saving || saleItems.length === 0}
+                  disabled={saving || (saleItems || []).length === 0}
                   className="w-full"
                 >
                   {saving ? 'Updating Sale...' : 'Update Sale'}

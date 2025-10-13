@@ -1024,7 +1024,7 @@ function SettingsContent() {
 
         {/* Tab Content */}
         <div 
-          className="rounded-lg shadow-sm border"
+          className="rounded-lg border"
           style={{ 
             backgroundColor: 'var(--card)',
             borderColor: 'var(--border)'

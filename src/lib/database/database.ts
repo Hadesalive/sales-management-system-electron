@@ -11,6 +11,7 @@ import {
   DatabaseSale,
   DatabaseInvoiceTemplate,
   DatabaseInvoice,
+  DatabaseDeal,
 } from './schema';
 
 export class DatabaseService {
@@ -81,6 +82,15 @@ export class DatabaseService {
         email TEXT,
         phone TEXT,
         address TEXT,
+        city TEXT,
+        state TEXT,
+        zip TEXT,
+        country TEXT,
+        company TEXT,
+        notes TEXT,
+        is_active INTEGER DEFAULT 1,
+        store_credit REAL DEFAULT 0,
+        avatar TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
@@ -98,6 +108,8 @@ export class DatabaseService {
         category TEXT,
         stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
         min_stock INTEGER CHECK (min_stock >= 0),
+        is_active INTEGER DEFAULT 1,
+        image TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
@@ -116,6 +128,51 @@ export class DatabaseService {
         total REAL NOT NULL CHECK (total >= 0),
         status TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'cancelled', 'refunded')),
         payment_method TEXT NOT NULL CHECK (payment_method IN ('cash', 'card', 'bank_transfer', 'other')),
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Orders table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        order_number TEXT NOT NULL UNIQUE,
+        supplier_id TEXT,
+        supplier_name TEXT NOT NULL,
+        items TEXT NOT NULL, -- JSON array of items
+        subtotal REAL NOT NULL CHECK (subtotal >= 0),
+        tax REAL NOT NULL CHECK (tax >= 0),
+        discount REAL NOT NULL CHECK (discount >= 0),
+        total REAL NOT NULL CHECK (total >= 0),
+        status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'shipped', 'delivered', 'cancelled')),
+        payment_status TEXT NOT NULL CHECK (payment_status IN ('unpaid', 'partial', 'paid')),
+        payment_method TEXT CHECK (payment_method IN ('cash', 'card', 'bank_transfer', 'credit', 'other')),
+        expected_delivery_date TEXT,
+        actual_delivery_date TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Returns table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS returns (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        return_number TEXT NOT NULL UNIQUE,
+        sale_id TEXT REFERENCES sales(id) ON DELETE SET NULL,
+        customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
+        customer_name TEXT,
+        items TEXT NOT NULL, -- JSON array of items with reason and condition
+        subtotal REAL NOT NULL CHECK (subtotal >= 0),
+        tax REAL NOT NULL CHECK (tax >= 0),
+        total REAL NOT NULL CHECK (total >= 0),
+        refund_amount REAL NOT NULL CHECK (refund_amount >= 0),
+        refund_method TEXT NOT NULL CHECK (refund_method IN ('cash', 'store_credit', 'original_payment', 'exchange')),
+        status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'completed')),
+        processed_by TEXT,
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -179,6 +236,31 @@ export class DatabaseService {
         notes TEXT,
         terms TEXT,
         bank_details TEXT, -- JSON object
+        sale_id TEXT REFERENCES sales(id) ON DELETE SET NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Deals table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS deals (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        title TEXT NOT NULL,
+        customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
+        customer_name TEXT,
+        value REAL NOT NULL CHECK (value > 0),
+        probability INTEGER NOT NULL CHECK (probability >= 0 AND probability <= 100),
+        stage TEXT NOT NULL CHECK (stage IN ('lead', 'qualified', 'proposal', 'negotiation', 'closed-won', 'closed-lost')),
+        expected_close_date TEXT,
+        actual_close_date TEXT,
+        source TEXT,
+        priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+        tags TEXT DEFAULT '[]', -- JSON array
+        notes TEXT,
+        negotiation_history TEXT DEFAULT '[]', -- JSON array
+        stakeholders TEXT DEFAULT '[]', -- JSON array
+        competitor_info TEXT, -- JSON object
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
@@ -222,6 +304,14 @@ export class DatabaseService {
       AFTER UPDATE ON invoices
       BEGIN
         UPDATE invoices SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+      END
+    `);
+
+    this.db.exec(`
+      CREATE TRIGGER IF NOT EXISTS update_deals_timestamp
+      AFTER UPDATE ON deals
+      BEGIN
+        UPDATE deals SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
       END
     `);
   }
@@ -962,6 +1052,78 @@ export class DatabaseService {
       createdAt: row.created_at!,
       updatedAt: row.updated_at!,
     };
+  }
+
+  // Deal CRUD operations
+  async createDeal(data: Omit<DatabaseDeal, 'id' | 'created_at' | 'updated_at'>): Promise<DatabaseDeal> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare(`
+      INSERT INTO deals (
+        title, customer_id, customer_name, value, probability, stage,
+        expected_close_date, actual_close_date, source, priority, tags, notes,
+        negotiation_history, stakeholders, competitor_info
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      data.title,
+      data.customer_id || null,
+      data.customer_name || null,
+      data.value,
+      data.probability,
+      data.stage,
+      data.expected_close_date || null,
+      data.actual_close_date || null,
+      data.source || null,
+      data.priority || 'medium',
+      data.tags || '[]',
+      data.notes || null,
+      data.negotiation_history || '[]',
+      data.stakeholders || '[]',
+      data.competitor_info || null
+    );
+
+    const deal = this.db.prepare('SELECT * FROM deals WHERE id = ?').get(result.lastInsertRowid) as DatabaseDeal;
+    return deal;
+  }
+
+  async getDealById(id: string): Promise<DatabaseDeal | null> {
+    if (!this.db) return null;
+
+    const row = this.db.prepare('SELECT * FROM deals WHERE id = ?').get(id) as DatabaseDeal | undefined;
+    return row || null;
+  }
+
+  async getAllDeals(): Promise<DatabaseDeal[]> {
+    if (!this.db) return [];
+
+    const rows = this.db.prepare('SELECT * FROM deals ORDER BY created_at DESC').all() as DatabaseDeal[];
+    return rows;
+  }
+
+  async updateDeal(id: string, data: Partial<Omit<DatabaseDeal, 'id' | 'created_at' | 'updated_at'>>): Promise<DatabaseDeal | null> {
+    if (!this.db) return null;
+
+    const fields = Object.keys(data).filter(key => data[key as keyof typeof data] !== undefined);
+    if (fields.length === 0) return this.getDealById(id);
+
+    const setClause = fields.map(field => `${field} = ?`).join(', ');
+    const values = fields.map(field => data[field as keyof typeof data]);
+
+    const stmt = this.db.prepare(`UPDATE deals SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
+    stmt.run(...values, id);
+
+    return this.getDealById(id);
+  }
+
+  async deleteDeal(id: string): Promise<boolean> {
+    if (!this.db) return false;
+
+    const stmt = this.db.prepare('DELETE FROM deals WHERE id = ?');
+    const result = stmt.run(id);
+
+    return result.changes > 0;
   }
 
   // Utility methods

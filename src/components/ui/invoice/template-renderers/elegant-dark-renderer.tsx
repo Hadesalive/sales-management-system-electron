@@ -1,9 +1,13 @@
 import React from 'react';
 import { InvoiceTemplate } from '../invoice-templates';
+import { useSettings } from '@/contexts/SettingsContext';
+// Dynamic pagination imports - to be implemented
+// import { paginateInvoiceItems, PageBreak, ItemsRangeIndicator, needsSeparateTotalsPage } from '../multi-page-utils';
 
 interface InvoiceItem {
   id: string;
   description: string;
+  itemDescription?: string; // Additional item-specific description
   quantity: number;
   rate: number;
   amount: number;
@@ -58,16 +62,9 @@ interface TemplateRendererProps {
 }
 
 export function ElegantDarkRenderer({ data, template, brandLogos = [] }: TemplateRendererProps) {
+  const { formatCurrency } = useSettings();
   const subtotal = data.items.reduce((sum, i) => sum + i.amount, 0);
   const tax = subtotal * (data.taxRate / 100);
-  const currency = data.currency || 'USD';
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
-  };
   const total = subtotal + tax - data.discount;
 
   // Footer component

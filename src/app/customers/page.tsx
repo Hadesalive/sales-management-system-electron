@@ -82,7 +82,7 @@ export default function CustomersPage() {
       try {
         const response = await customerService.deleteCustomer(customerId);
         if (response && response.success) {
-          setCustomers(customers.filter(c => c.id !== customerId));
+          setCustomers((customers || []).filter(c => c.id !== customerId));
           setToast({ message: 'Customer deleted successfully', type: 'success' });
         }
       } catch (error) {
@@ -159,7 +159,8 @@ export default function CustomersPage() {
 
   // Filter and sort customers
   const filteredAndSortedCustomers = useMemo(() => {
-    const filtered = customers.filter(customer => {
+    const currentCustomers = customers || [];
+    const filtered = currentCustomers.filter(customer => {
       const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            customer.phone?.includes(searchTerm);

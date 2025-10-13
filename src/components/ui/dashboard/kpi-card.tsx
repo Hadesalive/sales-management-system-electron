@@ -16,7 +16,7 @@ interface KPICardProps {
 
 export function KPICard({ title, value, icon, className = "", trend }: KPICardProps) {
   return (
-    <div className={cn("p-6 rounded-xl shadow-sm relative", className)} style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+    <div className={cn("p-6 rounded-xl relative", className)} style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
       <div className="h-2 w-16 rounded-full mb-4" style={{ background: 'var(--accent)' }} />
       <div className="text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>{title}</div>
       <div className="text-xl md:text-2xl font-bold mb-4 break-words overflow-hidden" style={{ color: 'var(--foreground)' }}>{value}</div>

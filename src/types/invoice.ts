@@ -1,6 +1,7 @@
 export interface InvoiceItem {
   id: string;
   description: string;
+  itemDescription?: string; // Additional item-specific description
   quantity: number;
   unitPrice: number;
   discount?: number;
@@ -122,4 +123,8 @@ export interface Invoice {
     endDate?: Date;
     nextDueDate: Date;
   };
+
+  // Sales integration
+  saleId?: string; // Reference to original sale
+  saleNumber?: string; // Sale number for quick reference
 }

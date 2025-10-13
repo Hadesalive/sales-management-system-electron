@@ -1,25 +1,30 @@
 import { BaseService } from './base.service';
-import { Sale, SaleItem, Product, SalesData, ApiResponse, PaginatedResponse } from '../types/core';
-
-interface StorageService {
-  getData(): SalesData | null;
-  addSale(data: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>): Promise<Sale | null>;
-  updateSale(id: string, updates: Partial<Sale>): Promise<Sale | null>;
-  deleteSale(id: string): Promise<boolean>;
-}
+import { Sale, SaleItem, Product, ApiResponse, PaginatedResponse } from '../types/core';
 
 export class SalesService extends BaseService {
-  getSales() {
-    throw new Error('Method not implemented.');
-  }
-  constructor(private storageService: StorageService) {
+  constructor() {
     super();
   }
 
   async getAllSales(): Promise<ApiResponse<Sale[]>> {
     try {
-      const data = this.storageService.getData();
-      return this.createSuccessResponse(data?.sales || []);
+      // Use Electron IPC to get sales
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+          success: boolean;
+          data?: Sale[];
+          error?: string;
+        };
+
+        if (!result.success) {
+          return this.createErrorResponse<Sale[]>(result.error || 'Failed to fetch sales');
+        }
+
+        return this.createSuccessResponse(result.data || []);
+      }
+
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<Sale[]>('Electron IPC not available');
     } catch (error) {
       return this.handleError<Sale[]>(error);
     }
@@ -27,9 +32,23 @@ export class SalesService extends BaseService {
 
   async getSaleById(id: string): Promise<ApiResponse<Sale | null>> {
     try {
-      const data = this.storageService.getData();
-      const sale = data?.sales?.find((s: Sale) => s.id === id) || null;
-      return this.createSuccessResponse(sale);
+      // Use Electron IPC to get sale by ID
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('get-sale-by-id', id) as {
+          success: boolean;
+          data?: Sale | null;
+          error?: string;
+        };
+
+        if (!result.success) {
+          return this.createErrorResponse<Sale | null>(result.error || 'Failed to fetch sale');
+        }
+
+        return this.createSuccessResponse(result.data || null);
+      }
+
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<Sale | null>('Electron IPC not available');
     } catch (error) {
       return this.handleError<Sale | null>(error);
     }
@@ -52,12 +71,23 @@ export class SalesService extends BaseService {
         return this.createErrorResponse<Sale>(stockValidation.error!);
       }
 
-      const result = await this.storageService.addSale(saleData);
-      if (!result) {
-        return this.createErrorResponse<Sale>('Failed to create sale');
+      // Use Electron IPC to create sale
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('create-sale', saleData) as {
+          success: boolean;
+          data?: Sale;
+          error?: string;
+        };
+
+        if (!result.success || !result.data) {
+          return this.createErrorResponse<Sale>(result.error || 'Failed to create sale');
+        }
+
+        return this.createSuccessResponse(result.data);
       }
 
-      return this.createSuccessResponse(result);
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<Sale>('Electron IPC not available');
     } catch (error) {
       return this.handleError<Sale>(error);
     }
@@ -65,12 +95,23 @@ export class SalesService extends BaseService {
 
   async updateSale(id: string, updates: Partial<Sale>): Promise<ApiResponse<Sale>> {
     try {
-      const result = await this.storageService.updateSale(id, updates);
-      if (!result) {
-        return this.createErrorResponse<Sale>('Sale not found');
+      // Use Electron IPC to update sale
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('update-sale', { id, updates }) as {
+          success: boolean;
+          data?: Sale;
+          error?: string;
+        };
+
+        if (!result.success) {
+          return this.createErrorResponse<Sale>(result.error || 'Failed to update sale');
+        }
+
+        return this.createSuccessResponse(result.data!);
       }
 
-      return this.createSuccessResponse(result);
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<Sale>('Electron IPC not available');
     } catch (error) {
       return this.handleError<Sale>(error);
     }
@@ -78,8 +119,22 @@ export class SalesService extends BaseService {
 
   async deleteSale(id: string): Promise<ApiResponse<boolean>> {
     try {
-      const result = await this.storageService.deleteSale(id);
-      return this.createSuccessResponse(result);
+      // Use Electron IPC to delete sale
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('delete-sale', id) as {
+          success: boolean;
+          error?: string;
+        };
+
+        if (!result.success) {
+          return this.createErrorResponse<boolean>(result.error || 'Failed to delete sale');
+        }
+
+        return this.createSuccessResponse(true);
+      }
+
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<boolean>('Electron IPC not available');
     } catch (error) {
       return this.handleError<boolean>(error);
     }
@@ -87,10 +142,25 @@ export class SalesService extends BaseService {
 
   async getSalesByStatus(status: Sale['status']): Promise<ApiResponse<Sale[]>> {
     try {
-      const data = this.storageService.getData();
-      const sales = data?.sales || [];
-      const filtered = sales.filter((sale: Sale) => sale.status === status);
-      return this.createSuccessResponse(filtered);
+      // Use Electron IPC to get all sales and filter by status
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+          success: boolean;
+          data?: Sale[];
+          error?: string;
+        };
+
+        if (!result.success) {
+          return this.createErrorResponse<Sale[]>(result.error || 'Failed to fetch sales');
+        }
+
+        const sales = result.data || [];
+        const filtered = sales.filter((sale: Sale) => sale.status === status);
+        return this.createSuccessResponse(filtered);
+      }
+
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<Sale[]>('Electron IPC not available');
     } catch (error) {
       return this.handleError<Sale[]>(error);
     }
@@ -98,13 +168,28 @@ export class SalesService extends BaseService {
 
   async getRecentSales(limit: number = 10): Promise<ApiResponse<Sale[]>> {
     try {
-      const data = this.storageService.getData();
-      const sales = data?.sales || [];
-      const recent = sales
-        .sort((a: Sale, b: Sale) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, limit);
-      
-      return this.createSuccessResponse(recent);
+      // Use Electron IPC to get all sales and sort by date
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+          success: boolean;
+          data?: Sale[];
+          error?: string;
+        };
+
+        if (!result.success) {
+          return this.createErrorResponse<Sale[]>(result.error || 'Failed to fetch sales');
+        }
+
+        const sales = result.data || [];
+        const recent = sales
+          .sort((a: Sale, b: Sale) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, limit);
+        
+        return this.createSuccessResponse(recent);
+      }
+
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<Sale[]>('Electron IPC not available');
     } catch (error) {
       return this.handleError<Sale[]>(error);
     }
@@ -112,21 +197,35 @@ export class SalesService extends BaseService {
 
   async getSalesPaginated(page: number = 1, limit: number = 10): Promise<ApiResponse<PaginatedResponse<Sale>>> {
     try {
-      const data = this.storageService.getData();
-      const sales = data?.sales || [];
-      
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedSales = sales.slice(startIndex, endIndex);
+      // Use Electron IPC to get all sales and paginate
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+          success: boolean;
+          data?: Sale[];
+          error?: string;
+        };
 
-      return this.createSuccessResponse({
-        items: paginatedSales,
-        total: sales.length,
-        page,
-        limit,
-        hasNext: endIndex < sales.length,
-        hasPrev: page > 1,
-      });
+        if (!result.success) {
+          return this.createErrorResponse<PaginatedResponse<Sale>>(result.error || 'Failed to fetch sales');
+        }
+
+        const sales = result.data || [];
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedSales = sales.slice(startIndex, endIndex);
+
+        return this.createSuccessResponse({
+          items: paginatedSales,
+          total: sales.length,
+          page,
+          limit,
+          hasNext: endIndex < sales.length,
+          hasPrev: page > 1,
+        });
+      }
+
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<PaginatedResponse<Sale>>('Electron IPC not available');
     } catch (error) {
       return this.handleError<PaginatedResponse<Sale>>(error);
     }
@@ -134,16 +233,30 @@ export class SalesService extends BaseService {
 
   async searchSales(query: string): Promise<ApiResponse<Sale[]>> {
     try {
-      const data = this.storageService.getData();
-      const sales = data?.sales || [];
-      
-      const filtered = sales.filter((sale: Sale) =>
-        sale.id.toLowerCase().includes(query.toLowerCase()) ||
-        sale.customerName?.toLowerCase().includes(query.toLowerCase()) ||
-        sale.paymentMethod.toLowerCase().includes(query.toLowerCase())
-      );
+      // Use Electron IPC to get all sales and filter
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+          success: boolean;
+          data?: Sale[];
+          error?: string;
+        };
 
-      return this.createSuccessResponse(filtered);
+        if (!result.success) {
+          return this.createErrorResponse<Sale[]>(result.error || 'Failed to fetch sales');
+        }
+
+        const sales = result.data || [];
+        const filtered = sales.filter((sale: Sale) =>
+          sale.id.toLowerCase().includes(query.toLowerCase()) ||
+          sale.customerName?.toLowerCase().includes(query.toLowerCase()) ||
+          sale.paymentMethod.toLowerCase().includes(query.toLowerCase())
+        );
+
+        return this.createSuccessResponse(filtered);
+      }
+
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<Sale[]>('Electron IPC not available');
     } catch (error) {
       return this.handleError<Sale[]>(error);
     }
@@ -151,20 +264,35 @@ export class SalesService extends BaseService {
 
   private async validateStockAvailability(items: SaleItem[]): Promise<ApiResponse<boolean>> {
     try {
-      const data = this.storageService.getData();
-      const products = data?.products || [];
+      // Use Electron IPC to get all products and validate stock
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('get-products') as {
+          success: boolean;
+          data?: Product[];
+          error?: string;
+        };
 
-      for (const item of items) {
-        const product = products.find((p: Product) => p.id === item.productId);
-        if (!product) {
-          return this.createErrorResponse<boolean>(`Product ${item.productName} not found`);
+        if (!result.success) {
+          return this.createErrorResponse<boolean>(result.error || 'Failed to fetch products');
         }
-        if (product.stock < item.quantity) {
-          return this.createErrorResponse<boolean>(`Insufficient stock for ${item.productName}. Available: ${product.stock}`);
+
+        const products = result.data || [];
+
+        for (const item of items) {
+          const product = products.find((p: Product) => p.id === item.productId);
+          if (!product) {
+            return this.createErrorResponse<boolean>(`Product ${item.productName} not found`);
+          }
+          if (product.stock < item.quantity) {
+            return this.createErrorResponse<boolean>(`Insufficient stock for ${item.productName}. Available: ${product.stock}`);
+          }
         }
+
+        return this.createSuccessResponse(true);
       }
 
-      return this.createSuccessResponse(true);
+      // No fallback - Electron IPC is required
+      return this.createErrorResponse<boolean>('Electron IPC not available');
     } catch (error) {
       return this.handleError<boolean>(error);
     }

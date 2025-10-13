@@ -13,15 +13,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { ConfirmationDialog } from '../dialogs/confirmation-dialog';
 import { useConfirmation } from '@/lib/hooks/useConfirmation';
 import { customerService, productService } from '@/lib/services';
-import { Customer, Product } from '@/lib/types/core';
-
-interface InvoiceItem {
-  id: string;
-  description: string;
-  quantity: number;
-  rate: number;
-  amount: number;
-}
+import { Customer, Product, InvoiceItem } from '@/lib/types/core';
 
 interface InvoiceData {
   invoiceNumber: string;
@@ -178,7 +170,6 @@ export function InvoiceBuilder({
         setSelectedCustomerId(initialData.customer.id);
       }
       setHasLoadedInitialData(true);
-      console.log('Loaded initial data with items:', initialData.items.length);
     }
   }, [initialData, hasLoadedInitialData, companySettings, generateInvoiceNumber]);
 
@@ -268,17 +259,16 @@ export function InvoiceBuilder({
     const newItem: InvoiceItem = {
       id: Date.now().toString(),
       description: "",
+      itemDescription: "",
       quantity: 1,
       rate: 0,
       amount: 0
     };
-    console.log('Adding new item:', newItem);
     setInvoiceData(prev => {
       const updated = {
         ...prev,
         items: [...prev.items, newItem]
       };
-      console.log('Items after add:', updated.items.length);
       return updated;
     });
   };
@@ -309,13 +299,11 @@ export function InvoiceBuilder({
         variant: 'danger'
       },
       () => {
-        console.log('Removing item:', id);
         setInvoiceData(prev => {
           const updated = {
             ...prev,
             items: prev.items.filter(item => item.id !== id)
           };
-          console.log('Items after remove:', updated.items.length);
           return updated;
         });
       }
@@ -656,6 +644,14 @@ export function InvoiceBuilder({
                               placeholder="Item description"
                               required
                             />
+                            <div className="mt-2">
+                              <Input
+                                label="Additional Details (Optional)"
+                                value={item.itemDescription || ''}
+                                onChange={(e) => updateItem(item.id, 'itemDescription', e.target.value)}
+                                placeholder="Additional item details, specifications, etc."
+                              />
+                            </div>
                           </div>
                           <div className="md:col-span-2">
                             <Input
@@ -810,15 +806,11 @@ export function InvoiceBuilder({
 
         <FormActions>
           <Button variant="outline" onClick={() => {
-            console.log('Preview data:', invoiceData);
             onPreview?.(invoiceData);
           }}>
             Preview
           </Button>
           <Button variant="default" onClick={() => {
-            console.log('Saving invoice data:', invoiceData);
-            console.log('Items count:', invoiceData.items.length);
-            console.log('Items:', JSON.stringify(invoiceData.items, null, 2));
             onSave?.(invoiceData);
           }}>
             Save Invoice

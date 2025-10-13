@@ -7,6 +7,7 @@
  * and saves it to a .dev-port file that Electron can read.
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -16,7 +17,7 @@ const possiblePorts = [3000, 3001, 3002, 3003, 3004, 3005];
 
 async function checkPort(port) {
   return new Promise((resolve) => {
-    const req = http.get(`http://localhost:${port}`, (res) => {
+    const req = http.get(`http://localhost:${port}`, () => {
       resolve(port);
     });
 

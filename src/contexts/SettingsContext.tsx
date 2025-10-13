@@ -195,7 +195,15 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   // Date formatting function
   const formatDate = (date: Date | string): string => {
+    if (!date) return 'N/A';
+    
     const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if date is valid
+    if (isNaN(dateObj.getTime())) {
+      return 'Invalid Date';
+    }
+    
     const format = preferences.dateFormat || 'MM/DD/YYYY';
     
     // Convert format to Intl.DateTimeFormat options

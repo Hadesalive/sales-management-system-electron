@@ -12,6 +12,13 @@ import { DynamicInvoicePreview } from '@/components/ui/invoice/dynamic-invoice-p
 import { InvoiceTemplate } from '@/components/ui/invoice/invoice-templates';
 import { allTemplates } from '@/components/ui/invoice/templates';
 import { useSettings } from '@/contexts/SettingsContext';
+
+// IPC Response type for Electron
+interface IpcResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
 import html2canvas from 'html2canvas';
 import { 
   ArrowLeftIcon,
@@ -39,6 +46,7 @@ import {
 const getDefaultInvoice = (): {
   id: string;
   number: string;
+  customerId?: string;
   customerName: string;
   customerEmail: string;
   customerAddress: string;
@@ -63,9 +71,12 @@ const getDefaultInvoice = (): {
   }>;
   notes: string;
   terms: string;
+  saleId?: string;
+  saleNumber?: string;
 } => ({
   id: '',
   number: '',
+  customerId: undefined,
   customerName: '',
   customerEmail: '',
   customerAddress: '',
@@ -84,6 +95,8 @@ const getDefaultInvoice = (): {
   items: [],
   notes: '',
   terms: '',
+  saleId: undefined,
+  saleNumber: undefined,
 });
 
 export default function InvoiceDetailsPage() {
@@ -96,6 +109,7 @@ export default function InvoiceDetailsPage() {
 
   const [invoice, setInvoice] = useState(getDefaultInvoice());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [viewMode, setViewMode] = useState<'invoice' | 'receipt'>('invoice');
   const [selectedTemplate, setSelectedTemplate] = useState<'pro-corporate' | 'modern-stripe' | 'minimal-outline' | 'elegant-dark' | 'classic-column'>('pro-corporate');
@@ -108,8 +122,19 @@ export default function InvoiceDetailsPage() {
   // Editable header/footer state
   const [isEditingHeader, setIsEditingHeader] = useState(false);
   const [isEditingFooter, setIsEditingFooter] = useState(false);
-  const [companyLogo, setCompanyLogo] = useState<string>('');
-  const [brandLogos, setBrandLogos] = useState<string[]>([]);
+  const [companyLogo, setCompanyLogo] = useState<string>('/Assets/topnotch-logo-dark.png');
+  const [brandLogos, setBrandLogos] = useState<string[]>([
+    '/logo/Apple-Logo.png',
+    '/logo/samsung-Logo.png',
+    '/logo/Dell Logo.png',
+    '/logo/playstation-logo.png',
+    '/logo/Google-logo.png',
+    '/logo/HP-Logо.png',
+    '/logo/lenovo-logo.png',
+    '/logo/microsoft-logo.png',
+    '/logo/Asus-Logo.png',
+    '/logo/Tplink-logo.png'
+  ]);
   
   // Company info from settings (use settings or fallback to defaults)
   // Parse address to get city, state, zip if available
@@ -122,7 +147,8 @@ export default function InvoiceDetailsPage() {
     zip: addressParts[2]?.split(' ')[1] || "94105",
     phone: companySettings.phone || "+1 (555) 123-4567",
     email: companySettings.email || "info@topnotch.com",
-    website: "www.topnotch.com" // Not in settings, use default
+    website: "www.topnotch.com", // Not in settings, use default
+    logo: "/Assets/topnotch-logo-dark.png"
   };
   
   // Editable footer content
@@ -141,6 +167,11 @@ export default function InvoiceDetailsPage() {
   
   // Payment tracking state
   const [newPaymentAmount, setNewPaymentAmount] = useState('');
+  const [showOverpaymentDialog, setShowOverpaymentDialog] = useState(false);
+  const [overpaymentAmount, setOverpaymentAmount] = useState(0);
+  const [showCreditDialog, setShowCreditDialog] = useState(false);
+  const [creditAmount, setCreditAmount] = useState('');
+  const [customerCredit, setCustomerCredit] = useState(0);
   
   const [bankDetails, setBankDetails] = useState({
     bankName: "Sierra Leone Commercial Bank LTD",
@@ -166,9 +197,246 @@ export default function InvoiceDetailsPage() {
   };
 
 
-  // Print Invoice/Receipt
-  const handlePrintInvoice = () => {
+
+  // Print Invoice/Receipt - using same rendering as PDF
+  const handlePrintInvoice = async () => {
+    try {
+      // Get the actual rendered invoice HTML from the DOM
+      const invoiceElement = invoiceRef.current;
+      
+
+
+      
+      if (!invoiceElement) {
+        setToast({ message: 'Invoice preview not found', type: 'error' });
+        return;
+      }
+
+      
+      // Get all computed styles and inline them
+      const clonedElement = invoiceElement.cloneNode(true) as HTMLElement;
+      
+      // Capture actual computed styles from the live DOM elements
+      const originalElements = invoiceElement.querySelectorAll('.print-invoice');
+      const printInvoiceElements = clonedElement.querySelectorAll('.print-invoice');
+      
+      printInvoiceElements.forEach((element, index) => {
+        const htmlElement = element as HTMLElement;
+        const originalElement = originalElements[index] as HTMLElement;
+        
+        // Get the actual computed styles from the rendered preview
+        const computedStyle = window.getComputedStyle(originalElement);
+        
+        // Capture ALL the important styles from the actual rendered element (same as download)
+        const stylesToCapture = [
+          'width', 'height', 'backgroundColor', 'color', 'fontFamily',
+          'border', 'borderWidth', 'borderStyle', 'borderColor', 'borderRadius',
+          'boxShadow', 'boxSizing', 'position', 'overflow', 'display', 'flexDirection'
+        ];
+        
+        const capturedStyles = stylesToCapture
+          .map(prop => {
+            const kebabCaseProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+            const value = computedStyle.getPropertyValue(kebabCaseProp);
+            return value ? `${kebabCaseProp}: ${value} !important;` : '';
+          })
+          .filter(Boolean)
+          .join('\n            ');
+        
+        // Preserve captured padding styles - margins now handled by @page
+        const paddingValue = computedStyle.getPropertyValue('padding-top') || '10mm';
+        
+        const preservedStyles = `
+          padding: ${paddingValue} !important;
+        `;
+        
+        htmlElement.setAttribute('style', capturedStyles + '\n            ' + preservedStyles);
+      });
+      
+      // Get all stylesheets - but filter out print media queries that remove borders
+      const styles = Array.from(document.styleSheets)
+        .map(styleSheet => {
+          try {
+            return Array.from(styleSheet.cssRules)
+              .map(rule => {
+                // Handle @media print rules specifically
+                if (rule instanceof CSSMediaRule && rule.media.mediaText.includes('print')) {
+                  // Filter out rules that strip borders
+                  const filteredRules = Array.from(rule.cssRules)
+                    .filter(nestedRule => !nestedRule.cssText.includes('border: none'))
+                    .map(nestedRule => nestedRule.cssText)
+                    .join('\n');
+                  return filteredRules ? `@media print { ${filteredRules} }` : '';
+                }
+                return rule.cssText;
+              })
+              .filter(Boolean)
+              .join('\n');
+          } catch {
+            return '';
+          }
+        })
+        .join('\n');
+
+      // Extract border styles to force them in print with explicit values
+      let borderOverridesGeneral = '';
+      let borderOverridesPrint = '';
+      
+        printInvoiceElements.forEach((element, index) => {
+          const originalElement = originalElements[index] as HTMLElement;
+          const computedStyle = window.getComputedStyle(originalElement);
+
+          // Get actual computed border values
+          const borderWidth = computedStyle.getPropertyValue('border-width');
+          const borderStyle = computedStyle.getPropertyValue('border-style');
+          const borderColor = computedStyle.getPropertyValue('border-color');
+          const borderRadius = computedStyle.getPropertyValue('border-radius');
+          const boxShadow = computedStyle.getPropertyValue('box-shadow');
+
+          if (borderWidth && borderWidth !== '0px' && borderWidth !== 'none') {
+            // Use maximum specificity selectors
+            const selector1 = `html body .print-invoice:nth-of-type(${index + 1})`;
+            const selector2 = `html body div[class*="print-invoice"]:nth-of-type(${index + 1})`;
+            const selector3 = `[style*="${borderWidth}"][style*="${borderColor}"]`;
+
+            const borderStyles = `
+              border-width: ${borderWidth} !important;
+              border-style: ${borderStyle} !important;
+              border-color: ${borderColor} !important;
+              border-radius: ${borderRadius} !important;
+              box-shadow: ${boxShadow} !important;
+            `;
+
+            // Add to general styles (highest specificity)
+            borderOverridesGeneral += `${selector1} { ${borderStyles} }\n`;
+            borderOverridesGeneral += `${selector2} { ${borderStyles} }\n`;
+            borderOverridesGeneral += `.print-invoice:nth-of-type(${index + 1})${selector3} { ${borderStyles} }\n`;
+
+            // Add to print styles (even more specific for @media print)
+            borderOverridesPrint += `${selector1} { ${borderStyles} }\n`;
+            borderOverridesPrint += `${selector2} { ${borderStyles} }\n`;
+            borderOverridesPrint += `.print-invoice:nth-of-type(${index + 1})${selector3} { ${borderStyles} }\n`;
+
+            // Add explicit border styles to the inline style attribute as well
+            const inlineBorderStyles = `
+              border-width: ${borderWidth} !important;
+              border-style: ${borderStyle} !important;
+              border-color: ${borderColor} !important;
+              border-radius: ${borderRadius} !important;
+              box-shadow: ${boxShadow} !important;
+            `;
+
+            element.setAttribute('style', element.getAttribute('style') + '\n            ' + inlineBorderStyles);
+          }
+        });
+      
+
+      // Create full HTML document with styles
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Invoice ${invoice.number}</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+              ${styles}
+              
+              body {
+                margin: 0;
+                padding: 0;
+                background: white;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                min-height: 100vh;
+              }
+              
+              .print-invoice:last-child {
+                page-break-after: avoid !important;
+              }
+              
+              /* Ensure colors and borders are preserved in print */
+              * {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              
+              /* Force border styles - general (loaded BEFORE @media print) */
+              ${borderOverridesGeneral}
+              
+              @media print {
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  display: block !important;
+                  justify-content: initial !important;
+                  align-items: initial !important;
+                  min-height: 100vh;
+                }
+                @page {
+                  size: A4;
+                  margin: 0; /* Completely zero - no margins at all */
+                }
+                
+                /* Remove custom margins - let @page handle it */
+                .print-invoice {
+                  margin: 0 !important;
+                }
+              }
+              
+              /* Force borders to appear in print - LOADED LAST to override everything */
+              @media print {
+                ${borderOverridesPrint}
+
+                /* Additional border enforcement - maximum specificity */
+                html body .print-invoice {
+                  border: inherit !important;
+                  border-width: inherit !important;
+                  border-style: inherit !important;
+                  border-color: inherit !important;
+                  border-radius: inherit !important;
+                  box-shadow: inherit !important;
+                }
+
+                /* Final override - target specific elements */
+                .print-invoice[style*="border-width"] {
+                  border-width: inherit !important;
+                  border-style: inherit !important;
+                  border-color: inherit !important;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            ${clonedElement.innerHTML}
+            <script>
+              window.onload = function() {
     window.print();
+                window.onafterprint = function() {
+                  window.close();
+                };
+              };
+            </script>
+          </body>
+        </html>
+      `;
+
+      // Open new window with the styled invoice
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+      } else {
+        // Fallback if popup blocked
+        setToast({ message: 'Please allow popups for printing', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error printing invoice:', error);
+      setToast({ message: 'Failed to print invoice', type: 'error' });
+    }
   };
 
   // Download Invoice as PDF by capturing actual rendered HTML
@@ -185,7 +453,6 @@ export default function InvoiceDetailsPage() {
           throw new Error('Invoice preview not found');
         }
 
-        console.log('Capturing HTML from rendered invoice...');
         
         // Get all computed styles and inline them
         const clonedElement = invoiceElement.cloneNode(true) as HTMLElement;
@@ -195,19 +462,18 @@ export default function InvoiceDetailsPage() {
         const printInvoiceElements = clonedElement.querySelectorAll('.print-invoice');
         
         printInvoiceElements.forEach((element, index) => {
-          const htmlElement = element as HTMLElement;
           const originalElement = originalElements[index] as HTMLElement;
-          
+
           // Get the actual computed styles from the rendered preview
           const computedStyle = window.getComputedStyle(originalElement);
-          
+
           // Capture ALL the important styles from the actual rendered element (excluding margins)
           const stylesToCapture = [
             'width', 'height', 'backgroundColor', 'color', 'fontFamily',
             'border', 'borderWidth', 'borderStyle', 'borderColor', 'borderRadius',
             'boxShadow', 'boxSizing', 'position', 'overflow', 'display', 'flexDirection'
           ];
-          
+
           const capturedStyles = stylesToCapture
             .map(prop => {
               const kebabCaseProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -216,28 +482,35 @@ export default function InvoiceDetailsPage() {
             })
             .filter(Boolean)
             .join('\n            ');
+
+          // Preserve captured padding styles - margins now handled by @page
+          const paddingValue = computedStyle.getPropertyValue('padding-top') || '10mm';
           
-          // Force equal padding and margins on all sides - override any captured margin styles
-          const paddingValue = computedStyle.getPropertyValue('padding-top') || '15mm';
-          const marginValue = '0 auto'; // Center the pages
-          const equalStyles = `
+          const preservedStyles = `
             padding: ${paddingValue} !important;
-            margin: ${marginValue} !important;
-            margin-top: 0 !important;
-            margin-right: auto !important;
-            margin-bottom: 0 !important;
-            margin-left: auto !important;
           `;
-          
-          htmlElement.setAttribute('style', capturedStyles + '\n            ' + equalStyles);
+
+          element.setAttribute('style', capturedStyles + '\n            ' + preservedStyles);
         });
         
-        // Get all stylesheets
+        // Get all stylesheets - but filter out print media queries that remove borders
         const styles = Array.from(document.styleSheets)
           .map(styleSheet => {
             try {
               return Array.from(styleSheet.cssRules)
-                .map(rule => rule.cssText)
+                .map(rule => {
+                  // Handle @media print rules specifically
+                  if (rule instanceof CSSMediaRule && rule.media.mediaText.includes('print')) {
+                    // Filter out rules that strip borders
+                    const filteredRules = Array.from(rule.cssRules)
+                      .filter(nestedRule => !nestedRule.cssText.includes('border: none'))
+                      .map(nestedRule => nestedRule.cssText)
+                      .join('\n');
+                    return filteredRules ? `@media print { ${filteredRules} }` : '';
+                  }
+                  return rule.cssText;
+                })
+                .filter(Boolean)
                 .join('\n');
             } catch {
               // Skip external stylesheets that can't be accessed
@@ -245,6 +518,48 @@ export default function InvoiceDetailsPage() {
             }
           })
           .join('\n');
+
+        // Extract border styles to force them in PDF with explicit values
+        let borderOverridesGeneral = '';
+        let borderOverridesPrint = '';
+        
+        printInvoiceElements.forEach((element, index) => {
+          const originalElement = originalElements[index] as HTMLElement;
+          const computedStyle = window.getComputedStyle(originalElement);
+          
+          // Get actual computed border values
+          const borderWidth = computedStyle.getPropertyValue('border-width');
+          const borderStyle = computedStyle.getPropertyValue('border-style');
+          const borderColor = computedStyle.getPropertyValue('border-color');
+          const borderRadius = computedStyle.getPropertyValue('border-radius');
+          const boxShadow = computedStyle.getPropertyValue('box-shadow');
+          
+          if (borderWidth && borderWidth !== '0px' && borderWidth !== 'none') {
+            // Use maximum specificity selectors
+            const selector1 = `html body .print-invoice:nth-of-type(${index + 1})`;
+            const selector2 = `html body div[class*="print-invoice"]:nth-of-type(${index + 1})`;
+            const selector3 = `[style*="${borderWidth}"][style*="${borderColor}"]`;
+
+            const borderStyles = `
+              border-width: ${borderWidth} !important;
+              border-style: ${borderStyle} !important;
+              border-color: ${borderColor} !important;
+              border-radius: ${borderRadius} !important;
+              box-shadow: ${boxShadow} !important;
+            `;
+
+            // Add to general styles (highest specificity)
+            borderOverridesGeneral += `${selector1} { ${borderStyles} }\n`;
+            borderOverridesGeneral += `${selector2} { ${borderStyles} }\n`;
+            borderOverridesGeneral += `.print-invoice:nth-of-type(${index + 1})${selector3} { ${borderStyles} }\n`;
+
+            // Add to print styles (even more specific for @media print)
+            borderOverridesPrint += `${selector1} { ${borderStyles} }\n`;
+            borderOverridesPrint += `${selector2} { ${borderStyles} }\n`;
+            borderOverridesPrint += `.print-invoice:nth-of-type(${index + 1})${selector3} { ${borderStyles} }\n`;
+          }
+        });
+        
 
         // Create full HTML document with styles
         const htmlContent = `
@@ -258,37 +573,70 @@ export default function InvoiceDetailsPage() {
               <style>
                 ${styles}
                 
-                  body {
-                    margin: 0;
-                    padding: 0;
-                    background: transparent;
-                  }
-                  
-                  .print-invoice:last-child {
-                    page-break-after: avoid !important;
-                  }
-                
-                /* Ensure borders are visible in PDF */
-                .print-invoice {
-                  border-style: solid !important;
-                  border-width: 6px !important;
-                  border-color: #f59e0b !important;
-                  box-shadow: 0 6px 25px rgba(0,0,0,0.18) !important;
-                  border-radius: 8px !important;
+                body {
+                  margin: 0;
+                  padding: 0;
+                  background: transparent;
+                  display: flex;
+                  justify-content: center;
+                  align-items: flex-start;
+                  min-height: 100vh;
                 }
                 
-                @media print {
-                  body { margin: 0; }
-                  @page {
-                    size: A4;
-                    margin: 0;
-                  }
+                .print-invoice:last-child {
+                  page-break-after: avoid !important;
                 }
                 
+                /* Ensure colors and borders are preserved in PDF */
                 * {
                   -webkit-print-color-adjust: exact !important;
                   color-adjust: exact !important;
                   print-color-adjust: exact !important;
+                }
+                
+                /* Force border styles - general (loaded BEFORE @media print) */
+                ${borderOverridesGeneral}
+                
+                @media print {
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  display: block !important;
+                  justify-content: initial !important;
+                  align-items: initial !important;
+                  min-height: 100vh;
+                }
+                  @page {
+                    size: A4;
+                    margin: 0; /* Completely zero - no margins at all */
+                  }
+                  
+                  /* Remove custom margins - let @page handle it */
+                  .print-invoice {
+                    margin: 0 !important;
+                  }
+                }
+                
+                /* Force borders to appear in PDF - LOADED LAST to override everything */
+                @media print {
+                  ${borderOverridesPrint}
+
+                  /* Additional border enforcement - maximum specificity */
+                  html body .print-invoice {
+                    border: inherit !important;
+                    border-width: inherit !important;
+                    border-style: inherit !important;
+                    border-color: inherit !important;
+                    border-radius: inherit !important;
+                    box-shadow: inherit !important;
+                  }
+
+                  /* Final override - target specific elements */
+                  .print-invoice[style*="border-width"] {
+                    border-width: inherit !important;
+                    border-style: inherit !important;
+                    border-color: inherit !important;
+                  }
                 }
               </style>
             </head>
@@ -298,37 +646,11 @@ export default function InvoiceDetailsPage() {
           </html>
         `;
 
-        console.log('Sending HTML to Electron for PDF generation...');
-        console.log('HTML Preview (first 500 chars):', htmlContent.substring(0, 500));
-        console.log('Number of .print-invoice elements found:', printInvoiceElements.length);
-        
-        // Debug: Check what border and padding styles were captured from the preview
-        originalElements.forEach((element, index) => {
-          const originalElement = element as HTMLElement;
-          const computedStyle = window.getComputedStyle(originalElement);
-          console.log(`Element ${index} captured styles:`, {
-            border: computedStyle.border,
-            borderWidth: computedStyle.borderWidth,
-            borderStyle: computedStyle.borderStyle,
-            borderColor: computedStyle.borderColor,
-            borderRadius: computedStyle.borderRadius,
-            boxShadow: computedStyle.boxShadow,
-            paddingTop: computedStyle.paddingTop,
-            paddingRight: computedStyle.paddingRight,
-            paddingBottom: computedStyle.paddingBottom,
-            paddingLeft: computedStyle.paddingLeft
-          });
-          
-          // Also check what styles are actually applied to the cloned element
-          const clonedElement = printInvoiceElements[index] as HTMLElement;
-          console.log(`Element ${index} final applied styles:`, clonedElement.getAttribute('style'));
-        });
 
         const pdfBase64 = await window.electron.ipcRenderer.invoke('generate-invoice-pdf-from-html', {
           htmlContent
         }) as string;
 
-        console.log('Received PDF base64, length:', pdfBase64?.length);
 
         if (!pdfBase64) {
           throw new Error('No PDF data received from Electron');
@@ -343,8 +665,6 @@ export default function InvoiceDetailsPage() {
         const byteArray = new Uint8Array(byteNumbers);
         const pdfBlob = new Blob([byteArray], { type: 'application/pdf' });
 
-        console.log('PDF Blob created, size:', pdfBlob.size);
-
         // Create download link
         const url = window.URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
@@ -357,25 +677,6 @@ export default function InvoiceDetailsPage() {
         document.body.removeChild(link);
         
         // Clean up
-        window.URL.revokeObjectURL(url);
-      } else {
-        // Fallback to API route for web environment
-        const response = await fetch(`/api/invoices/${invoice.id}/pdf?template=${selectedTemplate}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to generate PDF');
-        }
-
-        const pdfBlob = await response.blob();
-        const url = window.URL.createObjectURL(pdfBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Invoice-${invoice.number}.pdf`;
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
         window.URL.revokeObjectURL(url);
       }
 
@@ -434,14 +735,21 @@ export default function InvoiceDetailsPage() {
 
       setToast({ message: 'Generating PDF for email...', type: 'success' });
 
-      // Get PDF from our new API endpoint with current template
-      const response = await fetch(`/api/invoices/${invoice.id}/pdf?template=${selectedTemplate}`);
+      // Generate PDF using Electron IPC
+      if (!window.electron?.ipcRenderer) {
+        throw new Error('Electron not available');
+      }
       
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
+      const result = await window.electron.ipcRenderer.invoke('generate-invoice-pdf', {
+        invoiceId: invoice.id,
+        templateId: selectedTemplate
+      }) as IpcResponse;
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate PDF');
       }
 
-      const pdfBlob = await response.blob();
+      const pdfBlob = result.data as Blob;
 
       // Check if running in Electron
       if (typeof window !== 'undefined' && window.electron) {
@@ -583,34 +891,140 @@ export default function InvoiceDetailsPage() {
         return;
       }
 
-      const response = await fetch(`/api/invoices/${invoice.id}/payment`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Use Electron IPC to update payment
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        // Determine new status based on payment
+        let newStatus = invoice.status;
+        if (newTotalPaid >= invoice.total) {
+          newStatus = 'paid';
+        } else if (newTotalPaid > 0) {
+          newStatus = 'sent'; // Partially paid
+        }
+
+        const result = await window.electron.ipcRenderer.invoke('update-invoice', {
+          id: invoice.id,
+          body: {
+            paidAmount: newTotalPaid,
+            status: newStatus,
+          }
+        }) as {
+          success: boolean;
+          data?: typeof invoice;
+          error?: string;
+        };
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to update payment');
+        }
+
+        // Update local state
+        setInvoice(prev => ({
+          ...prev,
           paidAmount: newTotalPaid,
-        }),
-      });
+          status: newStatus,
+        }));
 
-      if (!response.ok) {
-        throw new Error('Failed to update payment');
+        setNewPaymentAmount('');
+        setToast({ message: `Payment of ${formatCurrency(paymentAmount)} recorded successfully`, type: 'success' });
+      } else {
+        throw new Error('Electron IPC not available');
       }
-
-      const result = await response.json();
-      
-      // Update local state
-      setInvoice(prev => ({
-        ...prev,
-        paidAmount: newTotalPaid,
-        status: result.invoice.status,
-      }));
-
-      setNewPaymentAmount('');
-      setToast({ message: result.message || 'Payment recorded successfully', type: 'success' });
     } catch (error) {
       console.error('Failed to update payment:', error);
       setToast({ message: 'Failed to record payment', type: 'error' });
+    }
+  };
+
+  // Handle applying customer credit to invoice
+  const handleApplyCredit = async () => {
+    if (!creditAmount || parseFloat(creditAmount) <= 0) {
+      setToast({ message: 'Please enter a valid credit amount', type: 'error' });
+      return;
+    }
+
+    try {
+      const creditToApply = parseFloat(creditAmount);
+      
+      if (creditToApply > customerCredit) {
+        setToast({ message: `Only ${formatCurrency(customerCredit)} credit available`, type: 'error' });
+        return;
+      }
+
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('apply-customer-credit', {
+          invoiceId: invoice.id,
+          customerId: invoice.customerId,
+          creditAmount: creditToApply
+        }) as {
+          success: boolean;
+          message?: string;
+          error?: string;
+          data?: {
+            creditApplied: number;
+            remainingCredit: number;
+            invoiceBalance: number;
+          };
+        };
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to apply credit');
+        }
+
+        setToast({ 
+          message: `${formatCurrency(creditToApply)} credit applied successfully!`, 
+          type: 'success' 
+        });
+        setShowCreditDialog(false);
+        setCreditAmount('');
+        setCustomerCredit(result.data?.remainingCredit || 0);
+        
+        // Reload invoice to show updated payment
+        window.location.reload();
+      } else {
+        throw new Error('Electron IPC not available');
+      }
+    } catch (error) {
+      console.error('Failed to apply credit:', error);
+      setToast({ message: 'Failed to apply credit', type: 'error' });
+    }
+  };
+
+  // Handle overpayment actions
+  const handleOverpayment = async (action: 'store-credit' | 'refunded' | 'keep') => {
+    try {
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('handle-invoice-overpayment', {
+          invoiceId: invoice.id,
+          action,
+          overpaymentAmount,
+          customerId: invoice.customerId
+        }) as {
+          success: boolean;
+          message?: string;
+          error?: string;
+          data?: {
+            newStoreCredit?: number;
+            refundedAmount?: number;
+            overpaymentAmount?: number;
+          };
+        };
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to handle overpayment');
+        }
+
+        setToast({ message: result.message || 'Overpayment handled successfully', type: 'success' });
+        setShowOverpaymentDialog(false);
+        setOverpaymentAmount(0);
+        
+        // Reload invoice to show updated data
+        window.location.reload();
+      } else {
+        throw new Error('Electron IPC not available');
+      }
+    } catch (error) {
+      console.error('Failed to handle overpayment:', error);
+      setToast({ message: 'Failed to handle overpayment', type: 'error' });
     }
   };
 
@@ -655,43 +1069,53 @@ export default function InvoiceDetailsPage() {
           }
         : undefined;
 
-      const response = await fetch(`/api/invoices/${invoice.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          invoiceType,
-          currency,
-          bankDetails: bankDetailsToSave,
-          status: invoice.status,
-        }),
-      });
+        // Use Electron IPC if available, otherwise fallback to API
+        if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+          const result = await window.electron.ipcRenderer.invoke('update-invoice', {
+            id: invoice.id,
+            body: {
+              invoiceType,
+              currency,
+              bankDetails: bankDetailsToSave,
+              status: invoice.status,
+            }
+          }) as IpcResponse;
 
-      if (!response.ok) {
-        throw new Error('Failed to update invoice');
-      }
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to update invoice');
+          }
 
-      setToast({ message: 'Invoice saved successfully!', type: 'success' });
+          setToast({ message: 'Invoice saved successfully!', type: 'success' });
+        }
     } catch (error) {
       console.error('Error saving invoice:', error);
       setToast({ message: 'Failed to save invoice', type: 'error' });
     }
   };
 
-  // Load templates from API
+  // Load templates from Electron IPC or API
   React.useEffect(() => {
     const loadTemplates = async () => {
       try {
-        const response = await fetch('/api/invoices/templates');
+        let templates: InvoiceTemplate[] = [];
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch templates');
+        // Use Electron IPC
+        if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+          const result = await window.electron.ipcRenderer.invoke('get-invoice-templates') as {
+            success: boolean;
+            data?: InvoiceTemplate[];
+            error?: string;
+          };
+          if (result.success) {
+            templates = result.data || [];
+          } else {
+            throw new Error(result.error || 'Failed to fetch templates');
+          }
+        } else {
+          throw new Error('Electron IPC not available');
         }
 
-        const templates = await response.json();
-
-        if (templates.length > 0) {
+        if (templates && templates.length > 0) {
           setAvailableTemplates(templates);
           // Find the selected template or use the first one
           const template = templates.find((t: InvoiceTemplate) => t.id === selectedTemplate) || templates[0];
@@ -728,20 +1152,55 @@ export default function InvoiceDetailsPage() {
       if (!params.id) return;
 
       try {
-        const response = await fetch(`/api/invoices/${params.id}`);
+        let invoiceData;
 
-        if (!response.ok) {
-          if (response.status === 404) {
-            setToast({ message: 'Invoice not found', type: 'error' });
-          } else {
-            throw new Error('Failed to load invoice');
-          }
-          return;
+        // Use Electron IPC
+        if (!window.electron?.ipcRenderer) {
+          throw new Error('Electron not available');
         }
-
-        const invoiceData = await response.json();
-
-        if (invoiceData) {
+        
+        const result = await window.electron.ipcRenderer.invoke('get-invoice-by-id', params.id) as IpcResponse;
+        if (result.success && result.data) {
+          invoiceData = result.data as {
+            id: string;
+            number: string;
+            customerId?: string;
+            customerName: string;
+            customerEmail: string;
+            customerAddress: string;
+            customerPhone: string;
+            issueDate: string;
+            dueDate: string;
+            invoiceType: "invoice" | "proforma" | "quote" | "credit_note" | "debit_note";
+            currency: string;
+            subtotal: number;
+            tax: number;
+            discount: number;
+            total: number;
+            paidAmount: number;
+            balance: number;
+            status: "draft" | "pending" | "sent" | "paid" | "overdue" | "cancelled";
+            items: Array<{
+              id: string;
+              description: string;
+              quantity: number;
+              rate: number;
+              amount: number;
+            }>;
+            notes: string;
+            terms: string;
+            bankDetails?: {
+              bankName: string;
+              accountName?: string;
+              accountNumber: string;
+              routingNumber?: string;
+              swiftCode?: string;
+            };
+            createdAt: string;
+            updatedAt: string;
+            saleId?: string;
+            saleNumber?: string;
+          };
           setInvoice(invoiceData);
           // Update other state based on loaded invoice
           setInvoiceType(invoiceData.invoiceType);
@@ -753,9 +1212,37 @@ export default function InvoiceDetailsPage() {
             routingNumber: invoiceData.bankDetails.routingNumber || '',
             swiftCode: invoiceData.bankDetails.swiftCode || '',
           } : bankDetails);
+          
+          // Check for overpayment
+          const paidAmount = invoiceData.paidAmount || 0;
+          const total = invoiceData.total || 0;
+          if (paidAmount > total) {
+            setOverpaymentAmount(paidAmount - total);
+            // Check URL parameter for overpayment flag
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('overpayment') === 'true') {
+              setShowOverpaymentDialog(true);
+            }
+          }
+          
+          // Load customer credit if customer exists
+          if (invoiceData.customerId && typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+            const customerResult = await window.electron.ipcRenderer.invoke('get-customer-by-id', invoiceData.customerId) as {
+              success: boolean;
+              data?: { storeCredit?: number };
+            };
+            if (customerResult.success && customerResult.data) {
+              setCustomerCredit(customerResult.data.storeCredit || 0);
+            }
+          }
+        } else {
+          setError(result.error || 'Invoice not found');
+          setToast({ message: result.error || 'Invoice not found', type: 'error' });
+          return;
         }
       } catch (error) {
         console.error('Error loading invoice:', error);
+        setError('Failed to load invoice');
         setToast({ message: 'Failed to load invoice', type: 'error' });
       } finally {
         setLoading(false);
@@ -772,6 +1259,41 @@ export default function InvoiceDetailsPage() {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
             <p className="text-muted-foreground">Loading invoice details...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <XCircleIcon className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-foreground mb-2">Invoice Not Found</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <div className="space-x-4">
+              <Button
+                onClick={() => router.push('/invoices')}
+                className="inline-flex items-center gap-2"
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+                Back to Invoices
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setError(null);
+                  setLoading(true);
+                  // Reload the invoice
+                  window.location.reload();
+                }}
+                className="inline-flex items-center gap-2"
+              >
+                Try Again
+              </Button>
+            </div>
           </div>
         </div>
       </AppLayout>
@@ -799,6 +1321,22 @@ export default function InvoiceDetailsPage() {
               <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
                 View and manage invoice information
               </p>
+              {invoice.saleId && (
+                <div className="mt-2">
+                  <button
+                    onClick={() => router.push(`/sales/${invoice.saleId}`)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                    style={{ 
+                      backgroundColor: 'var(--accent)10', 
+                      color: 'var(--accent)',
+                      border: '1px solid var(--accent)30'
+                    }}
+                  >
+                    <CurrencyDollarIcon className="h-3 w-3" />
+                    Created from Sale #{invoice.saleNumber || invoice.saleId.substring(0, 8)}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -854,10 +1392,26 @@ export default function InvoiceDetailsPage() {
             icon={<CurrencyDollarIcon className="h-6 w-6" style={{ color: 'var(--accent)' }} />}
           />
           <KPICard
-            title="Balance Due"
-            value={formatCurrency((invoice.total || 0) - (invoice.paidAmount || 0))}
-            icon={<ClockIcon className="h-6 w-6 text-orange-500" />}
+            title={overpaymentAmount > 0 ? "Overpayment" : "Balance Due"}
+            value={formatCurrency(Math.abs((invoice.total || 0) - (invoice.paidAmount || 0)))}
+            icon={overpaymentAmount > 0 ? 
+              <CurrencyDollarIcon className="h-6 w-6 text-green-500" /> : 
+              <ClockIcon className="h-6 w-6 text-orange-500" />
+            }
           />
+          {overpaymentAmount > 0 && (
+            <button
+              onClick={() => setShowOverpaymentDialog(true)}
+              className="col-span-1 p-4 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <CurrencyDollarIcon className="h-5 w-5 text-yellow-600" />
+                <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+                  Handle Overpayment
+                </span>
+              </div>
+            </button>
+          )}
           <KPICard
             title="Status"
             value={invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
@@ -865,7 +1419,7 @@ export default function InvoiceDetailsPage() {
           />
           <KPICard
             title="Due Date"
-            value={formatDate(invoice.dueDate)}
+            value={formatDate(invoice.dueDate || invoice.issueDate || new Date())}
             icon={<CalendarIcon className="h-6 w-6" style={{ color: 'var(--accent)' }} />}
           />
         </div>
@@ -987,6 +1541,28 @@ export default function InvoiceDetailsPage() {
                   <p className="text-xs text-gray-500 mt-1">
                     Enter the amount received from the customer
                   </p>
+                  
+                  {/* Store Credit Option */}
+                  {invoice.customerId && customerCredit > 0 && (invoice.total - (invoice.paidAmount || 0)) > 0 && (
+                    <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                          Available Store Credit
+                        </label>
+                        <span className="text-sm font-semibold text-green-600">
+                          {formatCurrency(customerCredit)}
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowCreditDialog(true)}
+                        className="w-full flex items-center justify-center gap-2"
+                      >
+                        <CurrencyDollarIcon className="h-4 w-4" />
+                        Apply Store Credit
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1496,6 +2072,152 @@ export default function InvoiceDetailsPage() {
             </div>
           </div>
         </div>
+
+        {/* Store Credit Dialog */}
+        {showCreditDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground">Apply Store Credit</h3>
+                <button
+                  onClick={() => {
+                    setShowCreditDialog(false);
+                    setCreditAmount('');
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="mb-6 space-y-4">
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-green-800 dark:text-green-200">Available Credit:</span>
+                    <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                      {formatCurrency(customerCredit)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Outstanding Balance:</span>
+                    <span className="text-lg font-bold text-foreground">
+                      {formatCurrency((invoice.total || 0) - (invoice.paidAmount || 0))}
+                    </span>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-foreground">
+                    Credit Amount to Apply
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max={Math.min(customerCredit, (invoice.total || 0) - (invoice.paidAmount || 0))}
+                    step="0.01"
+                    placeholder="Enter amount"
+                    value={creditAmount}
+                    onChange={(e) => setCreditAmount(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Maximum: {formatCurrency(Math.min(customerCredit, (invoice.total || 0) - (invoice.paidAmount || 0)))}
+                  </p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const maxCredit = Math.min(customerCredit, (invoice.total || 0) - (invoice.paidAmount || 0));
+                      setCreditAmount(maxCredit.toString());
+                    }}
+                    className="flex-1"
+                  >
+                    Use Maximum
+                  </Button>
+                  <Button
+                    onClick={handleApplyCredit}
+                    disabled={!creditAmount || parseFloat(creditAmount) <= 0}
+                    className="flex-1"
+                  >
+                    Apply Credit
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Overpayment Dialog */}
+        {showOverpaymentDialog && overpaymentAmount > 0 && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground">Overpayment Detected</h3>
+                <button
+                  onClick={() => setShowOverpaymentDialog(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-muted-foreground mb-4">
+                  Customer has overpaid by <span className="font-bold text-accent">{formatCurrency(overpaymentAmount)}</span>.
+                  How would you like to handle this overpayment?
+                </p>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleOverpayment('store-credit')}
+                    className="w-full p-4 text-left rounded-lg border-2 border-border hover:border-accent hover:bg-accent/5 transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <CurrencyDollarIcon className="h-6 w-6 text-accent flex-shrink-0" />
+                      <div>
+                        <h4 className="font-semibold text-foreground">Convert to Store Credit</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Add {formatCurrency(overpaymentAmount)} to customer&apos;s store credit balance
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleOverpayment('refunded')}
+                    className="w-full p-4 text-left rounded-lg border-2 border-border hover:border-accent hover:bg-accent/5 transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <CheckCircleIcon className="h-6 w-6 text-green-500 flex-shrink-0" />
+                      <div>
+                        <h4 className="font-semibold text-foreground">Mark as Refunded</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Customer has been refunded {formatCurrency(overpaymentAmount)}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleOverpayment('keep')}
+                    className="w-full p-4 text-left rounded-lg border-2 border-border hover:border-accent hover:bg-accent/5 transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <ClockIcon className="h-6 w-6 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <h4 className="font-semibold text-foreground">Keep on Account</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Leave overpayment on account for future invoices
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Toast Notifications */}
         {toast && (

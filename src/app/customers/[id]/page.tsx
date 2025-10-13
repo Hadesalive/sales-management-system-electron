@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/layouts/app-layout';
 import { Button, Toast, Alert } from '@/components/ui/core';
-import { KPICard } from '@/components/ui/dashboard';
+import { KPICard, PaginatedTableCard } from '@/components/ui/dashboard';
 import { CustomerForm } from '@/components/ui/forms/customer-form';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useConfirmation } from '@/lib/hooks/useConfirmation';
@@ -17,14 +17,11 @@ import {
   PencilIcon,
   TrashIcon,
   EnvelopeIcon,
-  PhoneIcon,
-  BuildingOfficeIcon,
-  MapPinIcon,
   CalendarIcon,
   ShoppingBagIcon,
   DocumentTextIcon,
   CurrencyDollarIcon,
-  ReceiptPercentIcon
+  BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 
 interface CustomerDetails {
@@ -32,7 +29,6 @@ interface CustomerDetails {
   totalOrders: number;
   totalSpent: number;
   lastOrderDate: string | null;
-  averageOrderValue: number;
 }
 
 export default function CustomerDetailsPage() {
@@ -113,8 +109,7 @@ export default function CustomerDetailsPage() {
           customer,
           totalOrders,
           totalSpent,
-          lastOrderDate,
-          averageOrderValue: totalOrders > 0 ? totalSpent / totalOrders : 0
+          lastOrderDate
         };
         
         setCustomerDetails(details);
@@ -133,23 +128,34 @@ export default function CustomerDetailsPage() {
     try {
       setLoadingInvoices(true);
       
-      // Fetch all invoices
-      const response = await fetch('/api/invoices');
-      if (!response.ok) {
-        throw new Error('Failed to fetch invoices');
+      // Use Electron IPC to fetch all invoices
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('get-invoices') as {
+          success: boolean;
+          data?: Array<{
+            id: string;
+            number: string;
+            issueDate: string;
+            total: number;
+            status: string;
+            customerId: string | null;
+          }>;
+          error?: string;
+        };
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to fetch invoices');
+        }
+        
+        const allInvoices = result.data || [];
+        
+        // Filter invoices for this customer
+        const customerInvs = allInvoices.filter((inv) => inv.customerId === customerId);
+        
+        setCustomerInvoices(customerInvs);
+      } else {
+        throw new Error('Electron IPC not available');
       }
-      
-      const allInvoices = await response.json();
-      
-      console.log('Customer ID:', customerId);
-      console.log('All invoices:', allInvoices);
-      console.log('All invoices with customerIds:', allInvoices.map((inv: { id: string; customerId: string | null; customerName: string }) => ({ id: inv.id, customerId: inv.customerId, customerName: inv.customerName })));
-      
-      // Filter invoices for this customer
-      const customerInvs = allInvoices.filter((inv: { customerId: string | null }) => inv.customerId === customerId);
-      
-      console.log('Filtered customer invoices:', customerInvs);
-      setCustomerInvoices(customerInvs);
     } catch (error) {
       console.error('Failed to load customer invoices:', error);
     } finally {
@@ -258,9 +264,105 @@ export default function CustomerDetailsPage() {
 
   const { customer } = customerDetails;
 
+  // Prepare invoice table data
+  const invoiceTableColumns = [
+    { key: 'number', label: 'Invoice Number' },
+    { key: 'date', label: 'Date' },
+    { key: 'total', label: 'Total' },
+    { key: 'status', label: 'Status' },
+    { key: 'actions', label: 'Actions' }
+  ];
+
+  const invoiceTableData = customerInvoices.map(invoice => ({
+    number: (
+      <div className="font-medium text-sm" style={{ color: 'var(--foreground)' }}>
+        {invoice.number}
+      </div>
+    ),
+    date: (
+      <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+        {formatDate(invoice.issueDate)}
+      </div>
+    ),
+    total: (
+      <div className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+        {formatCurrency(invoice.total)}
+      </div>
+    ),
+    status: (
+      <span className={`text-xs px-2 py-1 rounded-full ${
+        invoice.status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 
+        invoice.status === 'overdue' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' : 
+        'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+      }`}>
+        {invoice.status}
+      </span>
+    ),
+    actions: (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => router.push(`/invoices/${invoice.id}`)}
+      >
+        View
+      </Button>
+    )
+  }));
+
+  // Prepare sales table data
+  const salesTableColumns = [
+    { key: 'saleId', label: 'Sale ID' },
+    { key: 'date', label: 'Date' },
+    { key: 'items', label: 'Items' },
+    { key: 'total', label: 'Total' },
+    { key: 'status', label: 'Status' },
+    { key: 'actions', label: 'Actions' }
+  ];
+
+  const salesTableData = customerSales.map(sale => ({
+    saleId: (
+      <div className="font-medium text-sm" style={{ color: 'var(--foreground)' }}>
+        #{sale.id.substring(0, 8)}
+      </div>
+    ),
+    date: (
+      <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+        {formatDate(sale.createdAt)}
+      </div>
+    ),
+    items: (
+      <div className="text-sm" style={{ color: 'var(--foreground)' }}>
+        {sale.items.length} items
+      </div>
+    ),
+    total: (
+      <div className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+        {formatCurrency(sale.total)}
+      </div>
+    ),
+    status: (
+      <span className={`text-xs px-2 py-1 rounded-full ${
+        sale.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 
+        sale.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' : 
+        'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
+      }`}>
+        {sale.status}
+      </span>
+    ),
+    actions: (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => router.push(`/sales/${sale.id}`)}
+      >
+        View
+      </Button>
+    )
+  }));
+
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header with Back Button */}
         <div className="flex items-center justify-between">
           <Button
@@ -307,57 +409,72 @@ export default function CustomerDetailsPage() {
           </div>
         </div>
 
-        {/* Customer Info Card */}
+        {/* Hero Section - Customer Info Banner */}
         <div 
-          className="p-6 rounded-lg border"
+          className="relative overflow-hidden rounded-xl border"
           style={{ 
             backgroundColor: 'var(--card)',
             borderColor: 'var(--border)'
           }}
         >
-          <div className="flex items-center gap-4">
-            {/* Avatar */}
-            <div className="flex-shrink-0">
-              {customer.avatar ? (
-                <img
-                  src={customer.avatar}
-                  alt={customer.name}
-                  className="h-16 w-16 rounded-full object-cover border-2"
-                  style={{ borderColor: 'var(--border)' }}
-                />
-              ) : (
-                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
-                  {customer.name.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
-
-            {/* Info */}
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--foreground)' }}>
-                {customer.name}
-              </h1>
-              <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                <div className="flex items-center gap-1">
-                  <CalendarIcon className="h-4 w-4" />
-                  Customer since {formatDate(customer.createdAt)}
-                </div>
-                {customer.company && (
-                  <>
-                    <span>•</span>
-                    <div className="flex items-center gap-1">
-                      <BuildingOfficeIcon className="h-4 w-4" />
-                      {customer.company}
-                    </div>
-                  </>
+          {/* Background Gradient */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10"></div>
+          
+          {/* Content */}
+          <div className="relative p-8">
+            <div className="flex items-center gap-6">
+              {/* Avatar */}
+              <div className="flex-shrink-0">
+                {customer.avatar ? (
+                  <img
+                    src={customer.avatar}
+                    alt={customer.name}
+                    className="h-24 w-24 rounded-full object-cover border-4"
+                    style={{ borderColor: 'var(--background)' }}
+                  />
+                ) : (
+                  <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
+                    {customer.name.charAt(0).toUpperCase()}
+                  </div>
                 )}
+              </div>
+
+              {/* Info */}
+              <div className="flex-1">
+                <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>
+                  {customer.name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                  <div className="flex items-center gap-1.5">
+                    <CalendarIcon className="h-4 w-4" />
+                    Customer since {formatDate(customer.createdAt)}
+                  </div>
+                  {customer.company && (
+                    <>
+                      <span>•</span>
+                      <div className="flex items-center gap-1.5">
+                        <BuildingOfficeIcon className="h-4 w-4" />
+                        {customer.company}
+                      </div>
+                    </>
+                  )}
+                  {customer.email && (
+                    <>
+                      <span>•</span>
+                      <div className="flex items-center gap-1.5">
+                        <EnvelopeIcon className="h-4 w-4" />
+                        {customer.email}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         {/* KPI Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard 
             title="Total Orders" 
             value={customerDetails.totalOrders.toString()}
@@ -369,84 +486,84 @@ export default function CustomerDetailsPage() {
             icon={<CurrencyDollarIcon className="h-6 w-6" style={{ color: 'var(--accent)' }} />}
           />
           <KPICard 
-            title="Average Order" 
-            value={formatCurrency(customerDetails.averageOrderValue)}
-            icon={<ReceiptPercentIcon className="h-6 w-6" style={{ color: 'var(--accent)' }} />}
-          />
-          <KPICard 
             title="Last Order" 
             value={customerDetails.lastOrderDate ? formatDate(customerDetails.lastOrderDate) : 'No orders'}
             icon={<CalendarIcon className="h-6 w-6" style={{ color: 'var(--accent)' }} />}
+          />
+          <KPICard 
+            title="Store Credit" 
+            value={formatCurrency(customer.storeCredit || 0)}
+            icon={<CurrencyDollarIcon className="h-6 w-6 text-green-500" />}
           />
         </div>
 
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Customer Details */}
+          {/* Left Column - Contact Information */}
           <div className="lg:col-span-1 space-y-6">
             {/* Contact Information */}
-            {(customer.email || customer.phone || customer.address) && (
-              <div 
-                className="p-6 rounded-lg border"
-                style={{ 
-                  backgroundColor: 'var(--card)',
-                  borderColor: 'var(--border)'
-                }}
-              >
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
-                  Contact Information
-                </h2>
-                
-                <div className="space-y-3">
-                  {customer.email && (
-                    <div className="flex items-center gap-3">
-                      <EnvelopeIcon className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--muted-foreground)' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm" style={{ color: 'var(--foreground)' }}>
-                          {customer.email}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+            <div 
+              className="p-6 rounded-xl border"
+              style={{ 
+                backgroundColor: 'var(--card)',
+                borderColor: 'var(--border)'
+              }}
+            >
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--foreground)' }}>
+                <EnvelopeIcon className="h-5 w-5" style={{ color: 'var(--accent)' }} />
+                Contact Information
+              </h2>
+              
+              <div className="space-y-4">
+                {customer.email && (
+                  <div>
+                    <p className="text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>Email</p>
+                    <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                      {customer.email}
+                    </p>
+                  </div>
+                )}
 
-                  {customer.phone && (
-                    <div className="flex items-center gap-3">
-                      <PhoneIcon className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--muted-foreground)' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm" style={{ color: 'var(--foreground)' }}>
-                          {customer.phone}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                {customer.phone && (
+                  <div>
+                    <p className="text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>Phone</p>
+                    <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                      {customer.phone}
+                    </p>
+                  </div>
+                )}
 
-                  {customer.address && (
-                    <div className="flex items-start gap-3">
-                      <MapPinIcon className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--muted-foreground)' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm" style={{ color: 'var(--foreground)' }}>
-                          {customer.address}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                {customer.address && (
+                  <div>
+                    <p className="text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>Address</p>
+                    <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                      {customer.address}
+                    </p>
+                  </div>
+                )}
+
+                {!customer.email && !customer.phone && !customer.address && (
+                  <p className="text-sm text-center py-4" style={{ color: 'var(--muted-foreground)' }}>
+                    No contact information available
+                  </p>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Notes */}
             {customer.notes && (
               <div 
-                className="p-6 rounded-lg border"
+                className="p-6 rounded-xl border"
                 style={{ 
                   backgroundColor: 'var(--card)',
                   borderColor: 'var(--border)'
                 }}
               >
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--foreground)' }}>
+                  <DocumentTextIcon className="h-5 w-5" style={{ color: 'var(--accent)' }} />
                   Notes
                 </h2>
-                <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>
                   {customer.notes}
                 </p>
               </div>
@@ -456,154 +573,96 @@ export default function CustomerDetailsPage() {
           {/* Right Column - Activity History */}
           <div className="lg:col-span-2 space-y-6">
             {/* Invoice History */}
-        <div 
-          className="p-6 rounded-lg border"
-          style={{ 
-            backgroundColor: 'var(--card)',
-            borderColor: 'var(--border)'
-          }}
-        >
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>
-              Invoice History
-            </h2>
-            <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-              {customerInvoices.length} total invoices
-            </div>
-          </div>
-          
-          {loadingInvoices ? (
-            <div className="text-center py-8">
-              <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading invoices...</p>
-            </div>
-          ) : customerInvoices.length === 0 ? (
-            <div className="text-center py-12">
-              <DocumentTextIcon className="mx-auto h-12 w-12" style={{ color: 'var(--muted-foreground)' }} />
-              <h3 className="mt-2 text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-                No invoices yet
-              </h3>
-              <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                This customer doesn&apos;t have any invoices yet.
-              </p>
-              <Button
-                onClick={() => router.push('/invoices/new')}
-                className="mt-4"
+            {loadingInvoices ? (
+              <div 
+                className="p-6 rounded-xl border"
+                style={{ 
+                  backgroundColor: 'var(--card)',
+                  borderColor: 'var(--border)'
+                }}
               >
-                Create Invoice
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {customerInvoices.map((invoice) => (
-                <div 
-                  key={invoice.id}
-                  className="flex items-center justify-between p-4 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{ backgroundColor: 'var(--muted)' }}
-                  onClick={() => router.push(`/invoices/${invoice.id}`)}
-                >
-                  <div className="flex items-center gap-3">
-                    <DocumentTextIcon className="h-5 w-5" style={{ color: 'var(--muted-foreground)' }} />
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-                        {invoice.number}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                        {formatDate(invoice.issueDate)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-                      {formatCurrency(invoice.total)}
-                    </p>
-                    <p className={`text-xs capitalize ${
-                      invoice.status === 'paid' ? 'text-green-600' : 
-                      invoice.status === 'overdue' ? 'text-red-600' : 
-                      'text-yellow-600'
-                    }`}>
-                      {invoice.status}
-                    </p>
-                  </div>
+                <div className="text-center py-8">
+                  <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading invoices...</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
+            ) : customerInvoices.length === 0 ? (
+              <div 
+                className="p-6 rounded-xl border"
+                style={{ 
+                  backgroundColor: 'var(--card)',
+                  borderColor: 'var(--border)'
+                }}
+              >
+                <div className="text-center py-12">
+                  <DocumentTextIcon className="mx-auto h-12 w-12 mb-3" style={{ color: 'var(--muted-foreground)' }} />
+                  <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>
+                    No invoices yet
+                  </h3>
+                  <p className="text-sm mb-4" style={{ color: 'var(--muted-foreground)' }}>
+                    This customer doesn&apos;t have any invoices yet.
+                  </p>
+                  <Button
+                    onClick={() => router.push(`/invoices/new?customerId=${customerId}`)}
+                    size="sm"
+                  >
+                    Create Invoice
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <PaginatedTableCard
+                title={`Invoice History (${customerInvoices.length})`}
+                columns={invoiceTableColumns}
+                data={invoiceTableData}
+                itemsPerPage={5}
+              />
+            )}
 
-        {/* Sales History */}
-        <div 
-          className="p-6 rounded-lg border"
-          style={{ 
-            backgroundColor: 'var(--card)',
-            borderColor: 'var(--border)'
-          }}
-        >
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>
-              Sales History
-            </h2>
-            <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-              {customerSales.length} total sales
-            </div>
-          </div>
-          
-          {loadingSales ? (
-            <div className="text-center py-8">
-              <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading sales...</p>
-            </div>
-          ) : customerSales.length === 0 ? (
-            <div className="text-center py-12">
-              <ShoppingBagIcon className="mx-auto h-12 w-12" style={{ color: 'var(--muted-foreground)' }} />
-              <h3 className="mt-2 text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-                No sales yet
-              </h3>
-              <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                This customer hasn&apos;t made any purchases yet.
-              </p>
-              <Button
-                onClick={() => router.push('/sales/new')}
-                className="mt-4"
+            {/* Sales History */}
+            {loadingSales ? (
+              <div 
+                className="p-6 rounded-xl border"
+                style={{ 
+                  backgroundColor: 'var(--card)',
+                  borderColor: 'var(--border)'
+                }}
               >
-                Create Sale
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {customerSales.map((sale) => (
-                <div 
-                  key={sale.id}
-                  className="flex items-center justify-between p-4 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{ backgroundColor: 'var(--muted)' }}
-                  onClick={() => router.push(`/sales/${sale.id}`)}
-                >
-                  <div className="flex items-center gap-3">
-                    <ShoppingBagIcon className="h-5 w-5" style={{ color: 'var(--muted-foreground)' }} />
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-                        Sale #{sale.id.substring(0, 8)}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                        {formatDate(sale.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-                      {formatCurrency(sale.total)}
-                    </p>
-                    <p className={`text-xs capitalize ${
-                      sale.status === 'completed' ? 'text-green-600' : 
-                      sale.status === 'pending' ? 'text-yellow-600' : 
-                      'text-gray-600'
-                    }`}>
-                      {sale.status}
-                    </p>
-                  </div>
+                <div className="text-center py-8">
+                  <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading sales...</p>
                 </div>
-              ))}
-            </div>
-          )}
-          </div>
+              </div>
+            ) : customerSales.length === 0 ? (
+              <div 
+                className="p-6 rounded-xl border"
+                style={{ 
+                  backgroundColor: 'var(--card)',
+                  borderColor: 'var(--border)'
+                }}
+              >
+                <div className="text-center py-12">
+                  <ShoppingBagIcon className="mx-auto h-12 w-12 mb-3" style={{ color: 'var(--muted-foreground)' }} />
+                  <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>
+                    No sales yet
+                  </h3>
+                  <p className="text-sm mb-4" style={{ color: 'var(--muted-foreground)' }}>
+                    This customer hasn&apos;t made any purchases yet.
+                  </p>
+                  <Button
+                    onClick={() => router.push(`/sales/new?customerId=${customerId}`)}
+                    size="sm"
+                  >
+                    Create Sale
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <PaginatedTableCard
+                title={`Sales History (${customerSales.length})`}
+                columns={salesTableColumns}
+                data={salesTableData}
+                itemsPerPage={5}
+              />
+            )}
           </div>
         </div>
 

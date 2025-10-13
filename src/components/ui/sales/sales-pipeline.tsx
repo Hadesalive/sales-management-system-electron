@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/contexts/SettingsContext";
 import { PlusIcon } from "@heroicons/react/24/outline";
 
 interface Deal {
@@ -32,12 +33,7 @@ export function SalesPipeline({
   onMoveDeal, 
   className = "" 
 }: SalesPipelineProps) {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
+  const { formatCurrency } = useSettings();
 
   return (
     <div className={cn("w-full", className)}>
@@ -48,7 +44,7 @@ export function SalesPipeline({
             className="w-full"
           >
             <div 
-              className="rounded-xl shadow-sm p-4"
+              className="rounded-xl p-4"
               style={{ 
                 background: 'var(--card)', 
                 border: '1px solid var(--border)' 
@@ -103,7 +99,7 @@ export function SalesPipeline({
                 {stage.deals.map((deal) => (
                   <div
                     key={deal.id}
-                    className="p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-shadow"
+                    className="p-3 rounded-lg border cursor-pointer transition-shadow"
                     style={{ 
                       backgroundColor: 'var(--background)',
                       borderColor: 'var(--border)'

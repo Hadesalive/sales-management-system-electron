@@ -1,16 +1,45 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { AppLayout } from '@/components/layouts/app-layout';
 import { Button, Toast } from '@/components/ui/core';
 import { InvoiceBuilder } from '@/components/ui/invoice';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
-export default function NewInvoicePage() {
+function NewInvoicePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [, setIsPreviewMode] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [prefilledData, setPrefilledData] = useState<any>(undefined);
+
+  // Handle prefilled data from sales
+  useEffect(() => {
+    const dataParam = searchParams.get('data');
+    const fromSale = searchParams.get('fromSale');
+    
+    if (dataParam && fromSale) {
+      try {
+        const decodedData = JSON.parse(decodeURIComponent(dataParam));
+        // Add sale reference to the prefilled data
+        const enhancedData = {
+          ...decodedData,
+          saleId: fromSale,
+          saleNumber: fromSale.substring(0, 8)
+        };
+        setPrefilledData(enhancedData);
+        setToast({ 
+          message: `Invoice data pre-filled from Sale #${fromSale.substring(0, 8)}`, 
+          type: 'success' 
+        });
+      } catch (error) {
+        console.error('Failed to parse prefilled data:', error);
+        setToast({ message: 'Failed to load prefilled data', type: 'error' });
+      }
+    }
+  }, [searchParams]);
 
   const handleSave = async (invoiceData: {
     invoiceNumber?: string;
@@ -67,8 +96,15 @@ export default function NewInvoicePage() {
         : '';
 
       // Prepare the request body
+      console.log('Preparing invoice request body:', {
+        saleId: prefilledData?.saleId,
+        hasPrefilledData: !!prefilledData,
+        invoiceNumber
+      });
+      
       const requestBody = {
         number: invoiceNumber,
+        saleId: prefilledData?.saleId || undefined,
         customerId: customer?.id || undefined,
         customerName: customer?.name || '',
         customerEmail: customer?.email || '',
@@ -88,67 +124,79 @@ export default function NewInvoicePage() {
         bankDetails: undefined,
       };
 
-      const response = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
+      // Use Electron IPC to create invoice
+      console.log('Sending invoice to IPC:', {
+        ...requestBody,
+        itemsCount: requestBody.items.length
       });
+      
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('create-invoice', requestBody) as {
+          success: boolean;
+          data?: {
+            id: string;
+            number: string;
+            customerId?: string;
+            customerName?: string;
+            customerEmail?: string;
+            customerAddress?: string;
+            customerPhone?: string;
+            items: Array<{
+              id?: string;
+              description?: string;
+              quantity?: number;
+              rate?: number;
+              amount?: number;
+            }>;
+            subtotal: number;
+            tax: number;
+            discount: number;
+            total: number;
+            status: string;
+            invoiceType: string;
+            currency: string;
+            dueDate?: string;
+            notes?: string;
+            terms?: string;
+            hasOverpayment?: boolean;
+            overpaymentAmount?: number;
+          };
+          error?: string;
+          warning?: string;
+        };
 
-      if (!response.ok) {
-        throw new Error('Failed to create invoice');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to create invoice');
+        }
+
+        const invoice = result.data;
+        
+        // Check for overpayment warning
+        if (result.warning) {
+          setToast({ message: result.warning, type: 'error' });
+          
+          // Still navigate but show the warning
+          setTimeout(() => {
+            router.push(`/invoices/${invoice?.id}?overpayment=true`);
+          }, 2000);
+        } else {
+          setToast({ message: `Invoice ${invoice?.number} created successfully!`, type: 'success' });
+          
+          // Redirect to the new invoice after a short delay
+          setTimeout(() => {
+            router.push(`/invoices/${invoice?.id}`);
+          }, 1000);
+        }
+      } else {
+        throw new Error('Electron IPC not available');
       }
-
-      const invoice = await response.json();
-      setToast({ message: `Invoice ${invoice.number} created successfully!`, type: 'success' });
-
-      // Redirect to the new invoice after a short delay
-      setTimeout(() => {
-        router.push(`/invoices/${invoice.id}`);
-      }, 1000);
     } catch (error) {
       console.error('Failed to save invoice:', error);
       setToast({ message: 'Failed to save invoice', type: 'error' });
     }
   };
 
-  const handlePreview = (invoiceData: {
-    invoiceNumber?: string;
-    date?: string;
-    dueDate?: string;
-    company?: {
-      name: string;
-      address: string;
-      city: string;
-      state: string;
-      zip: string;
-      phone: string;
-      email: string;
-      logo?: string;
-    };
-    customer?: {
-      name: string;
-      address: string;
-      city: string;
-      state: string;
-      zip: string;
-      phone: string;
-      email: string;
-    };
-    items?: Array<{
-      id?: string;
-      description?: string;
-      quantity?: number;
-      rate?: number;
-      amount?: number;
-    }>;
-    taxRate?: number;
-    discount?: number;
-    notes?: string;
-    terms?: string;
-  }) => {
-    console.log('Preview invoice:', invoiceData);
+  const handlePreview = () => {
     setIsPreviewMode(true);
   };
 
@@ -180,6 +228,7 @@ export default function NewInvoicePage() {
           <InvoiceBuilder
             onSave={handleSave}
             onPreview={handlePreview}
+            initialData={prefilledData}
             className="p-6"
           />
         </div>
@@ -196,5 +245,22 @@ export default function NewInvoicePage() {
         )}
       </div>
     </AppLayout>
+  );
+}
+
+export default function NewInvoicePage() {
+  return (
+    <Suspense fallback={
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto mb-4" style={{ borderColor: 'var(--accent)' }}></div>
+            <p style={{ color: 'var(--muted-foreground)' }}>Loading...</p>
+          </div>
+        </div>
+      </AppLayout>
+    }>
+      <NewInvoicePageContent />
+    </Suspense>
   );
 }

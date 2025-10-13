@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/contexts/SettingsContext";
 import { CubeIcon, TagIcon } from "@heroicons/react/24/outline";
 
 interface Product {
@@ -24,16 +25,11 @@ export function ProductCatalog({
   onSelectProduct, 
   className = "" 
 }: ProductCatalogProps) {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
+  const { formatCurrency } = useSettings();
 
   return (
     <div 
-      className={cn("rounded-xl shadow-sm", className)}
+      className={cn("rounded-xl", className)}
       style={{ 
         background: 'var(--card)', 
         border: '1px solid var(--border)' 
@@ -62,7 +58,7 @@ export function ProductCatalog({
           {products.map((product) => (
             <div
               key={product.id}
-              className="p-4 rounded-lg border cursor-pointer hover:shadow-sm transition-all"
+              className="p-4 rounded-lg border cursor-pointer transition-all"
               style={{ 
                 backgroundColor: 'var(--background)',
                 borderColor: 'var(--border)'

@@ -55,7 +55,7 @@ export function Tabs({
     pills: {
       container: "rounded-lg p-1",
       tab: "rounded-md transition-colors",
-      active: "shadow-sm",
+      active: "",
       inactive: "hover:opacity-80"
     },
     underline: {
@@ -93,7 +93,7 @@ export function Tabs({
                 ? currentVariant.active 
                 : currentVariant.inactive,
               tab.disabled && "opacity-50 cursor-not-allowed",
-              variant === "pills" && activeTab === tab.id && "shadow-sm",
+              variant === "pills" && activeTab === tab.id && "",
             )}
             style={{
               color: activeTab === tab.id ? "var(--accent)" : "var(--muted-foreground)",

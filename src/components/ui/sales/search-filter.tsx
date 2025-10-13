@@ -122,7 +122,7 @@ export function SearchFilter({
           {/* Filter Dropdown */}
           {showFilterDropdown && (
             <div 
-              className="absolute right-0 top-full mt-2 w-80 rounded-xl shadow-lg z-50"
+              className="absolute right-0 top-full mt-2 w-80 rounded-xl z-50"
               style={{ 
                 background: "var(--card)", 
                 border: "1px solid var(--border)" 

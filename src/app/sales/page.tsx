@@ -7,8 +7,8 @@ import { Button, Toast } from '@/components/ui/core';
 import { Input } from '@/components/ui/forms';
 import { ConfirmationDialog } from '@/components/ui/dialogs/confirmation-dialog';
 import { useConfirmation } from '@/lib/hooks/useConfirmation';
-import { salesService } from '@/lib/services';
-import { Sale } from '@/lib/types/core';
+import { salesService, returnService } from '@/lib/services';
+import { Sale, Return } from '@/lib/types/core';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useRouter } from 'next/navigation';
 import { 
@@ -29,6 +29,7 @@ export default function SalesPage() {
   const { isOpen, options, confirm, handleConfirm, handleClose } = useConfirmation();
   
   const [sales, setSales] = useState<Sale[]>([]);
+  const [returns, setReturns] = useState<Return[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
@@ -46,12 +47,19 @@ export default function SalesPage() {
   const loadSales = async () => {
     try {
       setLoading(true);
-      const response = await salesService.getAllSales();
+      const [salesRes, returnsRes] = await Promise.all([
+        salesService.getAllSales(),
+        returnService.getAllReturns()
+      ]);
       
-      if (response.success && response.data) {
-        setSales(response.data);
+      if (salesRes.success && salesRes.data) {
+        setSales(salesRes.data);
       } else {
         setToast({ message: 'Failed to load sales', type: 'error' });
+      }
+
+      if (returnsRes.success && returnsRes.data) {
+        setReturns(returnsRes.data);
       }
     } catch (error) {
       console.error('Failed to load sales:', error);
@@ -93,7 +101,8 @@ export default function SalesPage() {
 
   // Filter and sort sales
   const filteredAndSortedSales = useMemo(() => {
-    const filtered = sales.filter(sale => {
+    const currentSales = sales || [];
+    const filtered = currentSales.filter(sale => {
       const matchesSearch = !searchTerm || 
         sale.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sale.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -132,18 +141,38 @@ export default function SalesPage() {
 
   // Calculate stats
   const stats = useMemo(() => {
-    const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
-    const totalSales = sales.length;
-    const pendingSales = sales.filter(sale => sale.status === 'pending').length;
-    const completedSales = sales.filter(sale => sale.status === 'completed').length;
+    const currentSales = sales || [];
+    const currentReturns = returns || [];
+    
+    // Calculate gross revenue from all sales
+    const grossRevenue = currentSales.reduce((sum, sale) => sum + sale.total, 0);
+    
+    // Calculate return impact (only completed/approved returns with cash/original_payment refunds)
+    const revenueReducingReturns = currentReturns.filter(
+      ret => 
+        (ret.status === 'completed' || ret.status === 'approved') &&
+        (ret.refundMethod === 'cash' || ret.refundMethod === 'original_payment')
+    );
+    const returnAmount = revenueReducingReturns.reduce((sum, ret) => sum + ret.refundAmount, 0);
+    
+    // Net revenue after returns (matching dashboard logic)
+    const netRevenue = grossRevenue - returnAmount;
+    
+    const totalSales = currentSales.length;
+    const pendingSales = currentSales.filter(sale => sale.status === 'pending').length;
+    const completedSales = currentSales.filter(sale => sale.status === 'completed').length;
+    const totalReturns = currentReturns.length;
     
     return {
-      totalRevenue,
+      grossRevenue,
+      returnAmount,
+      netRevenue,
       totalSales,
       pendingSales,
-      completedSales
+      completedSales,
+      totalReturns
     };
-  }, [sales]);
+  }, [sales, returns]);
 
   // Table configuration
   const tableColumns = [
@@ -156,9 +185,23 @@ export default function SalesPage() {
     { key: 'actions', label: 'Actions', sortable: false }
   ];
 
-  const tableData = filteredAndSortedSales.map(sale => ({
+  const tableData = filteredAndSortedSales.map(sale => {
+    // Check if this sale has any returns
+    const saleReturns = returns.filter(ret => ret.saleId === sale.id);
+    const hasReturns = saleReturns.length > 0;
+    
+    return {
     id: sale.id.substring(0, 8),
-    customer: sale.customerName || 'Walk-in Customer',
+    customer: (
+      <div className="flex items-center gap-2">
+        <span>{sale.customerName || 'Walk-in Customer'}</span>
+        {hasReturns && (
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+            Returned
+          </span>
+        )}
+      </div>
+    ),
     total: formatCurrency(sale.total),
     status: (
       <div className="flex items-center gap-2">
@@ -203,7 +246,8 @@ export default function SalesPage() {
         </Button>
       </div>
     )
-  }));
+    };
+  });
 
   if (loading) {
     return (
@@ -240,8 +284,8 @@ export default function SalesPage() {
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <KPICard 
-            title="Total Revenue" 
-            value={formatCurrency(stats.totalRevenue)}
+            title="Net Revenue" 
+            value={formatCurrency(stats.netRevenue)}
             icon={<CurrencyDollarIcon className="h-6 w-6" style={{ color: 'var(--accent)' }} />}
           />
           <KPICard 
@@ -255,9 +299,9 @@ export default function SalesPage() {
             icon={<ClockIcon className="h-6 w-6 text-yellow-500" />}
           />
           <KPICard 
-            title="Completed Sales" 
-            value={stats.completedSales.toString()}
-            icon={<CheckCircleIcon className="h-6 w-6 text-green-500" />}
+            title="Returns" 
+            value={`${stats.totalReturns} (${formatCurrency(stats.returnAmount)})`}
+            icon={<XCircleIcon className="h-6 w-6 text-red-500" />}
           />
         </div>
 
@@ -319,7 +363,7 @@ export default function SalesPage() {
         {/* Results Summary */}
         <div className="flex items-center justify-between text-sm" style={{ color: 'var(--muted-foreground)' }}>
           <span>
-            Showing {filteredAndSortedSales.length} of {sales.length} sales
+            Showing {filteredAndSortedSales.length} of {(sales || []).length} sales
             {searchTerm && ` matching "${searchTerm}"`}
             {statusFilter && ` with status "${statusFilter}"`}
             {paymentMethodFilter && ` paid via "${paymentMethodFilter}"`}

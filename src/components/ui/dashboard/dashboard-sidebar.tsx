@@ -11,12 +11,10 @@ import {
   AdjustmentsVerticalIcon,
   ClipboardDocumentListIcon,
   CurrencyDollarIcon,
-  TruckIcon,
   ArrowPathIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  DocumentTextIcon,
-  FunnelIcon} from "@heroicons/react/24/outline";
+  DocumentTextIcon} from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 import Image from "next/image";
 
@@ -42,13 +40,13 @@ interface SidebarItem {
 export const defaultSidebarItems = [
   { name: "Overview", icon: Squares2X2Icon },
   { name: "Sales", icon: CurrencyDollarIcon },
-  { name: "Pipeline", icon: FunnelIcon },
+  // { name: "Pipeline", icon: FunnelIcon }, // Commented out - coming in future release
   { name: "Invoices", icon: DocumentTextIcon },
   { name: "Orders", icon: ClipboardDocumentListIcon },
   { name: "Products", icon: CubeIcon },
   { name: "Customers", icon: UsersIcon },
   { name: "Inventory", icon: TagIcon },
-  { name: "Shipping", icon: TruckIcon },
+  // { name: "Shipping", icon: TruckIcon }, // Commented out - coming in future release
   { name: "Returns", icon: ArrowPathIcon },
   { name: "Reports", icon: ChartBarIcon },
   { name: "Settings", icon: AdjustmentsVerticalIcon },

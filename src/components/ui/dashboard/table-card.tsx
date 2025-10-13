@@ -71,7 +71,7 @@ export function PaginatedTableCard({ title, columns, data, className = "", heade
   };
   
   return (
-    <div className={cn("rounded-xl shadow-sm overflow-hidden", className)} style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+    <div className={cn("rounded-xl overflow-hidden", className)} style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
       <div className="p-5 font-medium flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
         <span style={{ color: 'var(--foreground)' }}>{title}</span>
         {headerActions && <div>{headerActions}</div>}

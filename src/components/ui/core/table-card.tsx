@@ -27,7 +27,7 @@ export function TableCard({
   return (
     <div 
       className={cn(
-        "rounded-xl shadow-sm overflow-hidden",
+        "rounded-xl overflow-hidden",
         className
       )}
       style={{ background: 'var(--card)', border: '1px solid var(--border)' }}

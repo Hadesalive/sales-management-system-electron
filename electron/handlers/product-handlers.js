@@ -21,9 +21,10 @@ function registerProductHandlers(databaseService) {
     }
   });
 
-  ipcMain.handle('update-product', async (event, productId, productData) => {
+  ipcMain.handle('update-product', async (event, payload) => {
     try {
-      const product = await databaseService.updateProduct(productId, productData);
+      const { id, updates } = payload;
+      const product = await databaseService.updateProduct(id, updates);
       return { success: true, data: product };
     } catch (error) {
       return { success: false, error: error.message };
@@ -38,6 +39,17 @@ function registerProductHandlers(databaseService) {
       return { success: false, error: error.message };
     }
   });
+
+  ipcMain.handle('get-product-by-id', async (event, productId) => {
+    try {
+      const product = await databaseService.getProductById(productId);
+      return { success: true, data: product };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  console.log('Product handlers registered');
 }
 
 module.exports = {

@@ -34,7 +34,7 @@
     ".next/types/**/*.ts",
     "next-env.d.ts",
     "out/types/**/*.ts"
-  ],
+, "src/app/pipeline.disabled/deals/new/page.tsx.disabled"  ],
   "exclude": [
     "node_modules"
   ]

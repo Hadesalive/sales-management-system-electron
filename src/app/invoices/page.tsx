@@ -53,19 +53,32 @@ export default function InvoicesPage() {
   const [sortBy, setSortBy] = useState<'issueDate' | 'dueDate' | 'total' | 'customerName'>('issueDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Load invoices from API
+  // Load invoices using Electron IPC
   useEffect(() => {
     const loadInvoices = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/invoices');
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch invoices');
+        
+        // Use Electron IPC if available (production/dev)
+        if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+          console.log('Loading invoices via IPC...');
+          const result = await window.electron.ipcRenderer.invoke('get-invoices') as { 
+            success: boolean; 
+            data?: typeof invoices; 
+            error?: string 
+          };
+          
+          if (result.success) {
+            console.log('Invoices loaded via IPC:', result.data?.length || 0);
+            setInvoices(result.data || []);
+          } else {
+            console.error('Failed to load invoices via IPC:', result.error);
+            setToast({ message: result.error || 'Failed to load invoices', type: 'error' });
+          }
+        } else {
+          console.warn('Electron IPC not available - this should not happen in production');
+          setToast({ message: 'Unable to connect to database', type: 'error' });
         }
-
-        const invoiceData = await response.json();
-        setInvoices(invoiceData);
       } catch (error) {
         console.error('Failed to load invoices:', error);
         setToast({ message: 'Failed to load invoices', type: 'error' });
@@ -137,10 +150,32 @@ export default function InvoicesPage() {
     };
   }, [invoices]);
 
-  const handleDeleteInvoice = (invoiceId: string) => {
-    // In real app, this would call an API
-    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
-    setToast({ message: 'Invoice deleted successfully', type: 'success' });
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    try {
+      if (!window.confirm('Are you sure you want to delete this invoice?')) {
+        return;
+      }
+
+      // Use Electron IPC if available
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('delete-invoice', invoiceId) as { 
+          success: boolean; 
+          error?: string 
+        };
+        
+        if (result.success) {
+          setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+          setToast({ message: 'Invoice deleted successfully', type: 'success' });
+        } else {
+          setToast({ message: result.error || 'Failed to delete invoice', type: 'error' });
+        }
+      } else {
+        setToast({ message: 'Unable to connect to database', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Failed to delete invoice:', error);
+      setToast({ message: 'Failed to delete invoice', type: 'error' });
+    }
   };
 
   const handleViewInvoice = (invoiceId: string) => {
@@ -233,7 +268,7 @@ export default function InvoicesPage() {
         <Button variant="ghost" size="sm" onClick={() => handleEditInvoice(invoice.id)}>
           <PencilIcon className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => console.log('Download invoice')}>
+        <Button variant="ghost" size="sm" onClick={() => router.push(`/invoices/${invoice.id}`)}>
           <ArrowDownTrayIcon className="h-4 w-4" />
         </Button>
         <Button 

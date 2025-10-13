@@ -24,25 +24,37 @@ export default function InvoiceTemplatesPage() {
   const [showPreview, setShowPreview] = useState(true);
   const [previewZoom, setPreviewZoom] = useState(45); // Start at 45% to show full A4 width
 
-  // Load templates from API
+  // Load templates using Electron IPC
   useEffect(() => {
     const loadTemplates = async () => {
       try {
-        const response = await fetch('/api/invoices/templates');
+        // Use Electron IPC if available
+        if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+          console.log('Loading templates via IPC...');
+          const result = await window.electron.ipcRenderer.invoke('get-invoice-templates') as {
+            success: boolean;
+            data?: InvoiceTemplate[];
+            error?: string;
+          };
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch templates');
-        }
-
-        const templates = await response.json();
-
-        if (templates.length > 0) {
-          setAvailableTemplates(templates);
-          setSelectedTemplate(templates[0].id);
-          setCurrentTemplate(templates[0]);
+          if (result.success && result.data && result.data.length > 0) {
+            console.log('Templates loaded via IPC:', result.data.length);
+            setAvailableTemplates(result.data);
+            setSelectedTemplate(result.data[0].id);
+            setCurrentTemplate(result.data[0]);
+          } else {
+            console.warn('No templates in database, using fallback');
+            // Fallback to hardcoded templates if none in database
+            const fallbackTemplates = allTemplates.slice(0, 2);
+            setAvailableTemplates(fallbackTemplates);
+            setSelectedTemplate(fallbackTemplates[0].id);
+            setCurrentTemplate(fallbackTemplates[0]);
+          }
         } else {
-          // Fallback to hardcoded templates if none in database
-          const fallbackTemplates = allTemplates.slice(0, 2); // Just use first 2 for demo
+          console.warn('Electron IPC not available');
+          setToast({ message: 'Unable to connect to database', type: 'error' });
+          // Fallback to hardcoded templates
+          const fallbackTemplates = allTemplates.slice(0, 2);
           setAvailableTemplates(fallbackTemplates);
           setSelectedTemplate(fallbackTemplates[0].id);
           setCurrentTemplate(fallbackTemplates[0]);
@@ -72,20 +84,26 @@ export default function InvoiceTemplatesPage() {
 
   const handleCustomize = async (template: InvoiceTemplate) => {
     try {
-      const response = await fetch(`/api/invoices/templates/${template.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(template),
-      });
+      // Use Electron IPC to update template
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('update-invoice-template', {
+          id: template.id,
+          data: template
+        }) as {
+          success: boolean;
+          data?: InvoiceTemplate;
+          error?: string;
+        };
 
-      if (!response.ok) {
-        throw new Error('Failed to update template');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to update template');
+        }
+
+        setCurrentTemplate(template);
+        setToast({ message: 'Template customized successfully!', type: 'success' });
+      } else {
+        throw new Error('Electron IPC not available');
       }
-
-      setCurrentTemplate(template);
-      setToast({ message: 'Template customized successfully!', type: 'success' });
     } catch (error) {
       console.error('Error saving template:', error);
       setToast({ message: 'Failed to save template', type: 'error' });
@@ -101,19 +119,25 @@ export default function InvoiceTemplatesPage() {
     if (!currentTemplate) return;
 
     try {
-      const response = await fetch(`/api/invoices/templates/${currentTemplate.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(currentTemplate),
-      });
+      // Use Electron IPC to save template
+      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+        const result = await window.electron.ipcRenderer.invoke('update-invoice-template', {
+          id: currentTemplate.id,
+          data: currentTemplate
+        }) as {
+          success: boolean;
+          data?: InvoiceTemplate;
+          error?: string;
+        };
 
-      if (!response.ok) {
-        throw new Error('Failed to save template');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to save template');
+        }
+
+        setToast({ message: 'Template saved successfully!', type: 'success' });
+      } else {
+        throw new Error('Electron IPC not available');
       }
-
-      setToast({ message: 'Template saved successfully!', type: 'success' });
     } catch (error) {
       console.error('Error saving template:', error);
       setToast({ message: 'Failed to save template', type: 'error' });
