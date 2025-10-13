@@ -314,6 +314,22 @@ export class DatabaseService {
         UPDATE deals SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
       END
     `);
+
+    this.db.exec(`
+      CREATE TRIGGER IF NOT EXISTS update_orders_timestamp
+      AFTER UPDATE ON orders
+      BEGIN
+        UPDATE orders SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+      END
+    `);
+
+    this.db.exec(`
+      CREATE TRIGGER IF NOT EXISTS update_returns_timestamp
+      AFTER UPDATE ON returns
+      BEGIN
+        UPDATE returns SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+      END
+    `);
   }
 
   private async seedDefaultData(): Promise<void> {

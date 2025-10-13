@@ -189,8 +189,8 @@ export default function DashboardPage() {
         // Store credit and exchange returns don't reduce revenue
         const revenueReducingReturns = returnsData.filter(
           (ret: Return) => 
-            (ret.status === 'completed' || ret.status === 'approved') &&
-            (ret.refundMethod === 'cash' || ret.refundMethod === 'original_payment')
+            ['completed', 'approved'].includes(ret.status) &&
+            ['cash', 'original_payment'].includes(ret.refundMethod)
         );
         const returnAmount = revenueReducingReturns.reduce((sum: number, ret: Return) => sum + ret.refundAmount, 0);
         const netRevenue = grossRevenue - returnAmount;
@@ -225,8 +225,8 @@ export default function DashboardPage() {
         // Calculate return impact
         const revenueReducingReturns = returnsData.filter(
           (ret: Return) => 
-            (ret.status === 'completed' || ret.status === 'approved') &&
-            (ret.refundMethod === 'cash' || ret.refundMethod === 'original_payment')
+            ['completed', 'approved'].includes(ret.status) &&
+            ['cash', 'original_payment'].includes(ret.refundMethod)
         );
         const returnAmount = revenueReducingReturns.reduce((sum: number, ret: Return) => sum + ret.refundAmount, 0);
         const netRevenue = salesRevenue - returnAmount;
@@ -462,8 +462,8 @@ export default function DashboardPage() {
       const returnDate = new Date(ret.createdAt);
       return returnDate.getMonth() === thisMonth && 
              returnDate.getFullYear() === thisYear &&
-             (ret.status === 'completed' || ret.status === 'approved') &&
-             (ret.refundMethod === 'cash' || ret.refundMethod === 'original_payment');
+             ['completed', 'approved'].includes(ret.status) &&
+             ['cash', 'original_payment'].includes(ret.refundMethod);
     });
 
     const returnAmount = thisMonthReturns.reduce((sum, ret) => sum + ret.refundAmount, 0);
@@ -526,8 +526,8 @@ export default function DashboardPage() {
       const returnDate = new Date(ret.createdAt);
       return returnDate.getMonth() === thisMonth && 
              returnDate.getFullYear() === thisYear &&
-             (ret.status === 'completed' || ret.status === 'approved') &&
-             (ret.refundMethod === 'cash' || ret.refundMethod === 'original_payment');
+             ['completed', 'approved'].includes(ret.status) &&
+             ['cash', 'original_payment'].includes(ret.refundMethod);
     });
 
     thisMonthReturns.forEach(ret => {
@@ -585,8 +585,8 @@ export default function DashboardPage() {
       const returnDate = new Date(ret.createdAt);
       return returnDate.getMonth() === thisMonth && 
              returnDate.getFullYear() === thisYear &&
-             (ret.status === 'completed' || ret.status === 'approved') &&
-             (ret.refundMethod === 'cash' || ret.refundMethod === 'original_payment');
+             ['completed', 'approved'].includes(ret.status) &&
+             ['cash', 'original_payment'].includes(ret.refundMethod);
     });
 
     const returnAmount = thisMonthReturns.reduce((sum, ret) => sum + ret.refundAmount, 0);

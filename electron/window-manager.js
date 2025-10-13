@@ -55,7 +55,24 @@ function createMainWindow() {
     mainWindow.loadURL(`http://localhost:${devPort}`);
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../out/index.html'));
+    // In production, serve the static files via HTTP server
+    const express = require('express');
+    const app = express();
+    const server = require('http').createServer(app);
+    
+    // Serve static files from the out directory
+    app.use(express.static(path.join(__dirname, '../out')));
+    
+    // Map _next/static to the actual static directory
+    app.use('/_next/static', express.static(path.join(__dirname, '../out/static')));
+    
+    // Start server on a random port
+    const port = 0; // Let the system choose an available port
+    server.listen(port, () => {
+      const actualPort = server.address().port;
+      console.log(`🌐 Serving production build on port ${actualPort}`);
+      mainWindow.loadURL(`http://localhost:${actualPort}/server/app/index.html`);
+    });
   }
 
   // Show window when ready

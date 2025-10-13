@@ -340,7 +340,7 @@ export default function NewSalePage() {
       } else {
         // Handle stock validation errors with details
         if (response.error === 'Stock validation failed' && (response as { details?: string[] }).details) {
-          const details = (response as { details: string[] }).details;
+          const details = (response as { details?: string[] }).details!;
           const errorMessage = details.join('\n');
           setToast({ message: errorMessage, type: 'error' });
         } else {

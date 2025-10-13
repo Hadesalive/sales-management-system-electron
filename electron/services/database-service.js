@@ -14,8 +14,18 @@ try {
 function createSQLiteDatabaseService() {
   console.log('Creating SQLite database service');
 
-  // Use the same database file as the frontend
-  const dbPath = path.join(process.cwd(), 'topnotch-sales.db');
+  // Determine database path based on environment
+  let dbPath;
+  if (process.env.NODE_ENV === 'production') {
+    // Production: use user data directory
+    const { app } = require('electron');
+    dbPath = path.join(app.getPath('userData'), 'topnotch-sales.db');
+    console.log('Production mode: Database in user data directory');
+  } else {
+    // Development: use project root
+    dbPath = path.join(process.cwd(), 'topnotch-sales.db');
+    console.log('Development mode: Database in project root');
+  }
   console.log('Database path:', dbPath);
 
   if (!sqlite3) {
@@ -1202,14 +1212,28 @@ function createSQLiteDatabaseService() {
     // Import/Export methods
     async exportData() {
       try {
+        console.log('📤 Exporting all data...');
+        
+        // Export ALL data including orders and returns
         const data = {
           customers: await this.getCustomers(),
           products: await this.getProducts(),
           sales: await this.getSales(),
           invoices: await this.getInvoices(),
+          orders: await this.getOrders(),      // ✅ Now included!
+          returns: await this.getReturns(),    // ✅ Now included!
           settings: await this.getCompanySettings(),
-          exportedAt: new Date().toISOString()
+          exportedAt: new Date().toISOString(),
+          version: '1.0.0' // For future compatibility
         };
+
+        console.log('✅ Data collected:');
+        console.log(`   - Customers: ${data.customers?.length || 0}`);
+        console.log(`   - Products: ${data.products?.length || 0}`);
+        console.log(`   - Sales: ${data.sales?.length || 0}`);
+        console.log(`   - Invoices: ${data.invoices?.length || 0}`);
+        console.log(`   - Orders: ${data.orders?.length || 0}`);
+        console.log(`   - Returns: ${data.returns?.length || 0}`);
 
         const { dialog } = require('electron');
         const result = await dialog.showSaveDialog({
@@ -1220,19 +1244,30 @@ function createSQLiteDatabaseService() {
 
         if (!result.canceled && result.filePath) {
           fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2));
-          return { success: true, path: result.filePath };
+          console.log('✅ Export saved to:', result.filePath);
+          return { success: true, path: result.filePath, recordCount: {
+            customers: data.customers?.length || 0,
+            products: data.products?.length || 0,
+            sales: data.sales?.length || 0,
+            invoices: data.invoices?.length || 0,
+            orders: data.orders?.length || 0,
+            returns: data.returns?.length || 0
+          }};
         }
 
         return { success: false, error: 'Export cancelled' };
       } catch (error) {
-        console.error('Error exporting data:', error);
+        console.error('❌ Error exporting data:', error);
         return { success: false, error: error.message };
       }
     },
 
     async importData() {
+      const { dialog, app } = require('electron');
+      const backupPath = path.join(app.getPath('userData'), `backup-${Date.now()}.json`);
+      
       try {
-        const { dialog } = require('electron');
+        // Step 1: Show file dialog
         const result = await dialog.showOpenDialog({
           title: 'Import Data',
           filters: [{ name: 'JSON Files', extensions: ['json'] }],
@@ -1243,38 +1278,386 @@ function createSQLiteDatabaseService() {
           return { success: false, error: 'Import cancelled' };
         }
 
+        console.log('📂 Reading import file:', result.filePaths[0]);
         const data = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
 
-        // Import customers
-        if (data.customers && Array.isArray(data.customers)) {
-          for (const customer of data.customers) {
-            await this.createCustomer(customer);
+        // Step 2: Validate import data structure
+        console.log('✅ Validating import data...');
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid import file: Not a valid JSON object');
+        }
+
+        // Validate arrays
+        const validationErrors = [];
+        if (data.customers && !Array.isArray(data.customers)) {
+          validationErrors.push('customers must be an array');
+        }
+        if (data.products && !Array.isArray(data.products)) {
+          validationErrors.push('products must be an array');
+        }
+        if (data.sales && !Array.isArray(data.sales)) {
+          validationErrors.push('sales must be an array');
+        }
+        if (data.invoices && !Array.isArray(data.invoices)) {
+          validationErrors.push('invoices must be an array');
+        }
+        if (data.orders && !Array.isArray(data.orders)) {
+          validationErrors.push('orders must be an array');
+        }
+        if (data.returns && !Array.isArray(data.returns)) {
+          validationErrors.push('returns must be an array');
+        }
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Invalid import data: ${validationErrors.join(', ')}`);
+        }
+
+        console.log('✅ Import data is valid');
+        console.log(`   - Customers: ${data.customers?.length || 0}`);
+        console.log(`   - Products: ${data.products?.length || 0}`);
+        console.log(`   - Sales: ${data.sales?.length || 0}`);
+        console.log(`   - Invoices: ${data.invoices?.length || 0}`);
+        console.log(`   - Orders: ${data.orders?.length || 0}`);
+        console.log(`   - Returns: ${data.returns?.length || 0}`);
+
+        // Step 3: Create backup of CURRENT data before import
+        console.log('💾 Creating backup of current data...');
+        const currentData = await this.exportData();
+        fs.writeFileSync(backupPath, JSON.stringify(currentData, null, 2));
+        console.log('✅ Backup created:', backupPath);
+
+        // Step 4: Confirm with user (they might not realize this will replace ALL data)
+        const confirmResult = await dialog.showMessageBox({
+          type: 'warning',
+          title: 'Confirm Import',
+          message: 'This will REPLACE all your current data!',
+          detail: `A backup has been created at:\n${backupPath}\n\nAre you sure you want to continue?`,
+          buttons: ['Cancel', 'Import'],
+          defaultId: 0,
+          cancelId: 0
+        });
+
+        if (confirmResult.response === 0) {
+          // User cancelled - delete backup
+          fs.unlinkSync(backupPath);
+          return { success: false, error: 'Import cancelled by user' };
+        }
+
+        try {
+          // Step 5: Import data (this can fail)
+          console.log('📥 Starting import...');
+
+          // Import customers
+          if (data.customers && Array.isArray(data.customers)) {
+            console.log(`   Importing ${data.customers.length} customers...`);
+            for (const customer of data.customers) {
+              await this.createCustomer(customer);
+            }
+          }
+
+          // Import products
+          if (data.products && Array.isArray(data.products)) {
+            console.log(`   Importing ${data.products.length} products...`);
+            for (const product of data.products) {
+              await this.createProduct(product);
+            }
+          }
+
+          // Import sales
+          if (data.sales && Array.isArray(data.sales)) {
+            console.log(`   Importing ${data.sales.length} sales...`);
+            for (const sale of data.sales) {
+              try {
+                await this.createSale(sale);
+              } catch (error) {
+                if (error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+                  console.log(`   ⚠️  Sale references non-existent customer/product, importing without foreign key...`);
+                  // Create sale without foreign key references
+                  const saleWithoutFK = { ...sale };
+                  saleWithoutFK.customerId = null; // Remove foreign key reference
+                  await this.createSale(saleWithoutFK);
+                } else {
+                  throw error; // Re-throw if it's not a foreign key error
+                }
+              }
+            }
+          }
+
+          // Import invoices
+          if (data.invoices && Array.isArray(data.invoices)) {
+            console.log(`   Importing ${data.invoices.length} invoices...`);
+            for (const invoice of data.invoices) {
+              try {
+                await this.createInvoice(invoice);
+              } catch (error) {
+                if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' && error.message.includes('invoices.number')) {
+                  console.log(`   ⚠️  Invoice number ${invoice.number} already exists, skipping...`);
+                  continue;
+                } else if (error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+                  console.log(`   ⚠️  Invoice references non-existent customer/sale, importing without foreign key...`);
+                  // Create invoice without foreign key references
+                  const invoiceWithoutFK = { ...invoice };
+                  invoiceWithoutFK.customerId = null;
+                  invoiceWithoutFK.saleId = null;
+                  await this.createInvoice(invoiceWithoutFK);
+                } else {
+                  throw error; // Re-throw if it's not a constraint error
+                }
+              }
+            }
+          }
+
+          // Import orders
+          if (data.orders && Array.isArray(data.orders)) {
+            console.log(`   Importing ${data.orders.length} orders...`);
+            for (const order of data.orders) {
+              try {
+                await this.createOrder(order);
+              } catch (error) {
+                if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' && error.message.includes('orders.order_number')) {
+                  console.log(`   ⚠️  Order number ${order.orderNumber} already exists, skipping...`);
+                  continue;
+                }
+                throw error; // Re-throw if it's not a unique constraint error
+              }
+            }
+          }
+
+          // Import returns
+          if (data.returns && Array.isArray(data.returns)) {
+            console.log(`   Importing ${data.returns.length} returns...`);
+            for (const returnData of data.returns) {
+              try {
+                await this.createReturn(returnData);
+              } catch (error) {
+                if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' && error.message.includes('returns.return_number')) {
+                  console.log(`   ⚠️  Return number ${returnData.returnNumber} already exists, skipping...`);
+                  continue;
+                } else if (error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+                  console.log(`   ⚠️  Return references non-existent sale/customer, importing without foreign key...`);
+                  // Create return without foreign key references
+                  const returnWithoutFK = { ...returnData };
+                  returnWithoutFK.saleId = null;
+                  returnWithoutFK.customerId = null;
+                  await this.createReturn(returnWithoutFK);
+                } else {
+                  throw error; // Re-throw if it's not a constraint error
+                }
+              }
+            }
+          }
+
+          // Import settings
+          if (data.settings) {
+            console.log('   Importing company settings...');
+            await this.updateCompanySettings(data.settings);
+          }
+
+          console.log('✅ Import completed successfully!');
+
+          // Step 6: Import successful - keep backup for 7 days then auto-delete
+          // (For now, we'll keep it - user can manually delete)
+          console.log(`💾 Backup will be kept at: ${backupPath}`);
+          console.log('   You can delete it manually if everything looks good.');
+
+          return { 
+            success: true, 
+            data,
+            message: 'Import successful! A backup of your previous data was saved.',
+            backupPath 
+          };
+
+        } catch (importError) {
+          // Step 7: Import failed - RESTORE from backup!
+          console.error('❌ Import failed:', importError);
+          console.log('🔄 Restoring from backup...');
+
+          try {
+            // Read backup
+            const backupData = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+            
+            // Clear database
+            db.prepare('DELETE FROM returns').run();
+            db.prepare('DELETE FROM orders').run();
+            db.prepare('DELETE FROM invoices').run();
+            db.prepare('DELETE FROM sales').run();
+            db.prepare('DELETE FROM products').run();
+            db.prepare('DELETE FROM customers').run();
+
+            // Restore from backup (using same import logic)
+            if (backupData.customers) {
+              for (const customer of backupData.customers) {
+                await this.createCustomer(customer);
+              }
+            }
+            if (backupData.products) {
+              for (const product of backupData.products) {
+                await this.createProduct(product);
+              }
+            }
+            if (backupData.sales) {
+              for (const sale of backupData.sales) {
+                await this.createSale(sale);
+              }
+            }
+            if (backupData.invoices) {
+              for (const invoice of backupData.invoices) {
+                await this.createInvoice(invoice);
+              }
+            }
+            if (backupData.orders) {
+              for (const order of backupData.orders) {
+                await this.createOrder(order);
+              }
+            }
+            if (backupData.returns) {
+              for (const returnData of backupData.returns) {
+                await this.createReturn(returnData);
+              }
+            }
+            if (backupData.settings) {
+              await this.updateCompanySettings(backupData.settings);
+            }
+
+            console.log('✅ Data restored from backup successfully');
+            
+            // Show success dialog
+            await dialog.showMessageBox({
+              type: 'info',
+              title: 'Import Failed - Data Restored',
+              message: 'Import failed, but your data has been restored from backup.',
+              detail: `Error: ${importError.message}\n\nYour original data is safe.`
+            });
+
+            return { 
+              success: false, 
+              error: `Import failed: ${importError.message}. Your data was restored from backup.`,
+              restored: true 
+            };
+
+          } catch (restoreError) {
+            // CRITICAL: Both import AND restore failed!
+            console.error('💀 CRITICAL: Restore from backup failed:', restoreError);
+            
+            await dialog.showErrorBox(
+              'CRITICAL ERROR',
+              `Import failed AND restore failed!\n\nBackup file: ${backupPath}\n\nPlease contact support immediately!`
+            );
+
+            return {
+              success: false,
+              error: `Import failed and restore failed. Backup saved at: ${backupPath}`,
+              critical: true,
+              backupPath
+            };
           }
         }
 
-        // Import products
-        if (data.products && Array.isArray(data.products)) {
-          for (const product of data.products) {
-            await this.createProduct(product);
-          }
-        }
-
-        // Import sales
-        if (data.sales && Array.isArray(data.sales)) {
-          for (const sale of data.sales) {
-            await this.createSale(sale);
-          }
-        }
-
-        // Import settings
-        if (data.settings) {
-          await this.updateCompanySettings(data.settings);
-        }
-
-        return { success: true, data };
       } catch (error) {
-        console.error('Error importing data:', error);
+        console.error('Error in import process:', error);
+        
+        // Clean up backup if it exists and we haven't started import yet
+        if (fs.existsSync(backupPath)) {
+          try {
+            fs.unlinkSync(backupPath);
+          } catch (cleanupError) {
+            console.error('Could not clean up backup:', cleanupError);
+          }
+        }
+
         return { success: false, error: error.message };
+      }
+    },
+
+    // Preferences methods
+    async getPreferences() {
+      try {
+        const row = db.prepare('SELECT * FROM company_settings WHERE id = 1').get();
+        if (row) {
+          return {
+            id: row.id,
+            companyName: row.company_name,
+            address: row.address,
+            phone: row.phone,
+            email: row.email,
+            website: row.website,
+            taxId: row.tax_id,
+            currency: row.currency,
+            timezone: row.timezone,
+            dateFormat: row.date_format,
+            invoicePrefix: row.invoice_prefix,
+            invoiceNumber: row.invoice_number,
+            quotePrefix: row.quote_prefix,
+            quoteNumber: row.quote_number,
+            lowStockThreshold: row.low_stock_threshold,
+            autoBackup: row.auto_backup,
+            backupFrequency: row.backup_frequency,
+            theme: row.theme,
+            language: row.language,
+            notifications: row.notifications,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+          };
+        }
+        return null;
+      } catch (error) {
+        console.error('Error getting preferences:', error);
+        return null;
+      }
+    },
+
+    async updatePreferences(updates) {
+      try {
+        const updateFields = [];
+        const updateValues = [];
+
+        // Map camelCase to snake_case for database
+        const fieldMapping = {
+          companyName: 'company_name',
+          address: 'address',
+          phone: 'phone',
+          email: 'email',
+          website: 'website',
+          taxId: 'tax_id',
+          currency: 'currency',
+          timezone: 'timezone',
+          dateFormat: 'date_format',
+          invoicePrefix: 'invoice_prefix',
+          invoiceNumber: 'invoice_number',
+          quotePrefix: 'quote_prefix',
+          quoteNumber: 'quote_number',
+          lowStockThreshold: 'low_stock_threshold',
+          autoBackup: 'auto_backup',
+          backupFrequency: 'backup_frequency',
+          theme: 'theme',
+          language: 'language',
+          notifications: 'notifications'
+        };
+
+        for (const [key, value] of Object.entries(updates)) {
+          if (fieldMapping[key] && value !== undefined) {
+            updateFields.push(`${fieldMapping[key]} = ?`);
+            updateValues.push(value);
+          }
+        }
+
+        if (updateFields.length === 0) {
+          return null;
+        }
+
+        updateValues.push(new Date().toISOString()); // updated_at
+        updateValues.push(1); // WHERE id = 1
+
+        const sql = `UPDATE company_settings SET ${updateFields.join(', ')}, updated_at = ? WHERE id = ?`;
+        const result = db.prepare(sql).run(...updateValues);
+
+        if (result.changes > 0) {
+          return await this.getPreferences();
+        }
+        return null;
+      } catch (error) {
+        console.error('Error updating preferences:', error);
+        return null;
       }
     }
   };

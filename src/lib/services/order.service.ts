@@ -5,7 +5,7 @@ export class OrderService {
   async getAllOrders(): Promise<ApiResponse<Order[]>> {
     try {
       if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-orders');
+        const result = await window.electron.ipcRenderer.invoke('get-orders') as ApiResponse<Order[]>;
         return {
           success: result.success,
           data: result.data || [],
@@ -27,7 +27,7 @@ export class OrderService {
   async getOrderById(id: string): Promise<ApiResponse<Order | null>> {
     try {
       if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-order-by-id', id);
+        const result = await window.electron.ipcRenderer.invoke('get-order-by-id', id) as ApiResponse<Order>;
         return {
           success: result.success,
           data: result.data || null,
@@ -49,12 +49,11 @@ export class OrderService {
   async createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Order>> {
     try {
       if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('create-order', orderData);
+        const result = await window.electron.ipcRenderer.invoke('create-order', orderData) as ApiResponse<Order>;
         return {
           success: result.success,
           data: result.data,
-          error: result.error,
-          details: result.details
+          error: result.error
         };
       }
       return { success: false, error: 'Electron IPC not available' };
@@ -71,7 +70,7 @@ export class OrderService {
   async updateOrder(id: string, updates: Partial<Omit<Order, 'id' | 'createdAt' | 'updatedAt'>>): Promise<ApiResponse<Order>> {
     try {
       if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('update-order', { id, updates });
+        const result = await window.electron.ipcRenderer.invoke('update-order', { id, updates }) as ApiResponse<Order>;
         return {
           success: result.success,
           data: result.data,
@@ -92,7 +91,7 @@ export class OrderService {
   async deleteOrder(id: string): Promise<ApiResponse<void>> {
     try {
       if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('delete-order', id);
+        const result = await window.electron.ipcRenderer.invoke('delete-order', id) as ApiResponse<boolean>;
         return {
           success: result.success,
           error: result.error

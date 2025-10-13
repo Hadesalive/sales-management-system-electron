@@ -10,6 +10,7 @@
     "start": "npx serve out -p 3000",
     "lint": "eslint",
     "electron": "electron .",
+    "electron-prod": "NODE_ENV=production electron .",
     "electron-dev": "node scripts/detect-port.js && concurrently \"npm run dev\" \"wait-on http-get://localhost:$(cat .dev-port 2>/dev/null || echo 3000) && cross-env NODE_ENV=development DEV_PORT=$(cat .dev-port 2>/dev/null || echo 3000) electron .\"",
     "electron-pack": "npm run build && electron-builder",
     "preelectron-pack": "npm run build"
@@ -22,6 +23,7 @@
     "better-sqlite3": "^9.6.0",
     "chart.js": "^4.5.0",
     "clsx": "^2.1.1",
+    "express": "^5.1.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",

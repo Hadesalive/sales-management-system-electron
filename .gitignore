@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database (development data - don't include in production)
+*.db
+*.db-shm
+*.db-wal
+topnotch-sales.db*
+
+# development port file
+.dev-port

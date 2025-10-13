@@ -23,32 +23,42 @@ function initializeApp() {
   registerAllHandlers(databaseService);
 }
 
-function setupApp() {
-  // Initialize database
-  databaseService.initialize()
-    .then(() => {
-      console.log('Database initialized successfully');
-    })
-    .catch((error) => {
-      console.error('Failed to initialize database:', error);
+async function setupApp() {
+  try {
+    // Initialize database FIRST and WAIT for it to complete
+    console.log('Initializing database...');
+    await databaseService.initialize();
+    console.log('✅ Database initialized successfully');
+
+    // Only create window AFTER database is ready
+    mainWindow = createMainWindow();
+
+    // Create application menu
+    createApplicationMenu(mainWindow);
+
+    // Handle window closed
+    mainWindow.on('closed', () => {
+      mainWindow = null;
     });
-
-  // Create main window
-  mainWindow = createMainWindow();
-
-  // Create application menu
-  createApplicationMenu(mainWindow);
-
-  // Handle window closed
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
+  } catch (error) {
+    console.error('❌ Failed to initialize database:', error);
+    
+    // Show error dialog to user
+    const { dialog } = require('electron');
+    dialog.showErrorBox(
+      'Database Initialization Error',
+      `Failed to start the application. Please try again or contact support.\n\nError: ${error.message}`
+    );
+    
+    // Quit the app - can't run without database
+    app.quit();
+  }
 }
 
 // App event listeners
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   initializeApp();
-  setupApp();
+  await setupApp(); // ← CRITICAL: Wait for database to be ready
 });
 
 app.on('window-all-closed', () => {
@@ -62,9 +72,9 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('activate', () => {
+app.on('activate', async () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    setupApp();
+    await setupApp(); // ← Also wait here (macOS reactivation)
   }
 });
 

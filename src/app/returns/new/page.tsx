@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { AppLayout } from '@/components/layouts/app-layout';
 import { Button, Toast } from '@/components/ui/core';
 import { Input, Select, Textarea } from '@/components/ui/forms';
@@ -15,7 +15,7 @@ import {
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
 
-export default function NewReturnPage() {
+function NewReturnPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { formatCurrency } = useSettings();
@@ -560,6 +560,14 @@ export default function NewReturnPage() {
         </Toast>
       )}
     </AppLayout>
+  );
+}
+
+export default function NewReturnPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <NewReturnPageContent />
+    </Suspense>
   );
 }
 
