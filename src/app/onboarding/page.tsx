@@ -135,16 +135,24 @@ export default function OnboardingPage() {
     }
   };
 
-  const completeOnboarding = () => {
-    // Save onboarding completion flag
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('onboarding_completed', 'true');
+  const completeOnboarding = async () => {
+    try {
+      // Save onboarding completion flag to database
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const electronAPI = window.electronAPI as Record<string, unknown>;
+        if ('updatePreferences' in electronAPI && typeof electronAPI.updatePreferences === 'function') {
+          await (electronAPI.updatePreferences as (prefs: { onboardingCompleted: boolean }) => Promise<unknown>)({ onboardingCompleted: true });
+        }
+      }
+      
+      setToast({ message: 'Welcome to TopNotch Sales Manager!', type: 'success' });
+      setTimeout(() => {
+        router.push('/');
+      }, 1500);
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      setToast({ message: 'Error saving onboarding status', type: 'error' });
     }
-    
-    setToast({ message: 'Welcome to TopNotch Sales Manager!', type: 'success' });
-    setTimeout(() => {
-      router.push('/');
-    }, 1500);
   };
 
   const updateSampleProduct = (index: number, field: string, value: string | number) => {

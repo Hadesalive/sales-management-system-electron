@@ -1,6 +1,7 @@
 import { CompanySettings, Customer } from '@/lib/types/core';
 
 export interface Preferences {
+  onboardingCompleted: boolean;
   autoSaveDrafts: boolean;
   confirmBeforeDelete: boolean;
   showAnimations: boolean;

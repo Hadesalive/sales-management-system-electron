@@ -2,6 +2,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { createTables, createIndexes, migrateDatabase, initializeDefaultData } = require('../schema/sqlite-schema');
 
 // Try to use SQLite database instead of JSON file for consistency
 let sqlite3 = null;
@@ -39,7 +40,10 @@ function createSQLiteDatabaseService() {
 
   return {
     async initialize() {
-      console.log('SQLite database initialized');
+      // Use shared schema for consistency
+      createTables(db);
+      migrateDatabase(db);
+      initializeDefaultData(db);
       return Promise.resolve();
     },
 
@@ -1210,7 +1214,7 @@ function createSQLiteDatabaseService() {
     },
 
     // Import/Export methods
-    async exportData() {
+    async exportData(options = { showDialog: true, autoSave: false, savePath: null }) {
       try {
         console.log('📤 Exporting all data...');
         
@@ -1235,17 +1239,11 @@ function createSQLiteDatabaseService() {
         console.log(`   - Orders: ${data.orders?.length || 0}`);
         console.log(`   - Returns: ${data.returns?.length || 0}`);
 
-        const { dialog } = require('electron');
-        const result = await dialog.showSaveDialog({
-          title: 'Export Data',
-          defaultPath: `topnotch-export-${new Date().toISOString().split('T')[0]}.json`,
-          filters: [{ name: 'JSON Files', extensions: ['json'] }]
-        });
-
-        if (!result.canceled && result.filePath) {
-          fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2));
-          console.log('✅ Export saved to:', result.filePath);
-          return { success: true, path: result.filePath, recordCount: {
+        // If auto-save with specified path (for backups), don't show dialog
+        if (options.autoSave && options.savePath) {
+          fs.writeFileSync(options.savePath, JSON.stringify(data, null, 2));
+          console.log('✅ Auto-saved to:', options.savePath);
+          return { success: true, path: options.savePath, data, recordCount: {
             customers: data.customers?.length || 0,
             products: data.products?.length || 0,
             sales: data.sales?.length || 0,
@@ -1255,7 +1253,40 @@ function createSQLiteDatabaseService() {
           }};
         }
 
-        return { success: false, error: 'Export cancelled' };
+        // Only show dialog if explicitly requested (user-initiated export)
+        if (options.showDialog) {
+          const { dialog } = require('electron');
+          const result = await dialog.showSaveDialog({
+            title: 'Export Data',
+            defaultPath: `topnotch-export-${new Date().toISOString().split('T')[0]}.json`,
+            filters: [{ name: 'JSON Files', extensions: ['json'] }]
+          });
+
+          if (!result.canceled && result.filePath) {
+            fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2));
+            console.log('✅ Export saved to:', result.filePath);
+            return { success: true, path: result.filePath, recordCount: {
+              customers: data.customers?.length || 0,
+              products: data.products?.length || 0,
+              sales: data.sales?.length || 0,
+              invoices: data.invoices?.length || 0,
+              orders: data.orders?.length || 0,
+              returns: data.returns?.length || 0
+            }};
+          }
+
+          return { success: false, error: 'Export cancelled' };
+        }
+
+        // If no dialog and no auto-save path, just return the data
+        return { success: true, data, recordCount: {
+          customers: data.customers?.length || 0,
+          products: data.products?.length || 0,
+          sales: data.sales?.length || 0,
+          invoices: data.invoices?.length || 0,
+          orders: data.orders?.length || 0,
+          returns: data.returns?.length || 0
+        }};
       } catch (error) {
         console.error('❌ Error exporting data:', error);
         return { success: false, error: error.message };
@@ -1322,8 +1353,7 @@ function createSQLiteDatabaseService() {
 
         // Step 3: Create backup of CURRENT data before import
         console.log('💾 Creating backup of current data...');
-        const currentData = await this.exportData();
-        fs.writeFileSync(backupPath, JSON.stringify(currentData, null, 2));
+        const currentData = await this.exportData({ showDialog: false, autoSave: true, savePath: backupPath });
         console.log('✅ Backup created:', backupPath);
 
         // Step 4: Confirm with user (they might not realize this will replace ALL data)
@@ -1595,6 +1625,7 @@ function createSQLiteDatabaseService() {
             theme: row.theme,
             language: row.language,
             notifications: row.notifications,
+            onboardingCompleted: Boolean(row.onboarding_completed),
             createdAt: row.created_at,
             updatedAt: row.updated_at
           };
@@ -1631,13 +1662,16 @@ function createSQLiteDatabaseService() {
           backupFrequency: 'backup_frequency',
           theme: 'theme',
           language: 'language',
-          notifications: 'notifications'
+          notifications: 'notifications',
+          onboardingCompleted: 'onboarding_completed'
         };
 
         for (const [key, value] of Object.entries(updates)) {
           if (fieldMapping[key] && value !== undefined) {
             updateFields.push(`${fieldMapping[key]} = ?`);
-            updateValues.push(value);
+            // Convert boolean to integer for SQLite (0 or 1)
+            const sqlValue = typeof value === 'boolean' ? (value ? 1 : 0) : value;
+            updateValues.push(sqlValue);
           }
         }
 
@@ -1698,6 +1732,7 @@ function createPersistentDatabaseService() {
   
   if (!persistentData.preferences) {
     persistentData.preferences = {
+      onboardingCompleted: false,
       autoSaveDrafts: true,
       confirmBeforeDelete: true,
       showAnimations: true,

@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { AppLayout } from '@/components/layouts/app-layout';
 import { Button, Badge, Toast } from '@/components/ui/core';
 import { KPICard, PaginatedTableCard } from '@/components/ui/dashboard';
@@ -241,14 +243,15 @@ export default function CustomersPage() {
     createdAt: formatDate(customer.createdAt),
     actions: (
       <div className="flex items-center space-x-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleViewCustomer(customer)}
-          className="p-1 h-8 w-8"
-        >
-          <EyeIcon className="h-4 w-4" />
-        </Button>
+        <Link href={`/customers/${customer.id}`}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-1 h-8 w-8"
+          >
+            <EyeIcon className="h-4 w-4" />
+          </Button>
+        </Link>
         <Button
           variant="ghost"
           size="sm"

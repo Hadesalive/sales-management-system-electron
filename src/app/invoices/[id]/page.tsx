@@ -104,6 +104,9 @@ export default function InvoiceDetailsPage() {
   const params = useParams();
   const { formatCurrency, formatDate, companySettings } = useSettings();
   
+  console.log('InvoiceDetailPage rendered with params:', params);
+  console.log('Current URL:', typeof window !== 'undefined' ? window.location.href : 'SSR');
+  
   // PDF mode detection (for future use if needed)
   // const isPDFMode = typeof window !== 'undefined' && window.location.search.includes('pdf=true');
 
@@ -1149,7 +1152,9 @@ export default function InvoiceDetailsPage() {
   // Load invoice data from database
   React.useEffect(() => {
     const loadInvoice = async () => {
-      if (!params.id) return;
+      if (!params.id) {
+        return;
+      }
 
       try {
         let invoiceData;
@@ -1160,6 +1165,7 @@ export default function InvoiceDetailsPage() {
         }
         
         const result = await window.electron.ipcRenderer.invoke('get-invoice-by-id', params.id) as IpcResponse;
+        
         if (result.success && result.data) {
           invoiceData = result.data as {
             id: string;

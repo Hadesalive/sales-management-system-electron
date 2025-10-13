@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Remove output: 'export' to allow dynamic routes in development
-  // output: 'export', // Only needed for static site generation
+  // Hybrid approach: Build static pages, use window-manager.js for routing
+  // Dynamic routes are handled client-side with IPC data fetching
+  // (NOT using output: 'export' to avoid generateStaticParams requirement)
   trailingSlash: true,
   images: {
     unoptimized: true

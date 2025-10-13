@@ -16,8 +16,9 @@ function registerDataHandlers(databaseService) {
       });
 
       if (!result.canceled) {
-        const data = await databaseService.exportData();
-        fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2));
+        // Get data without showing another dialog
+        const exportResult = await databaseService.exportData({ showDialog: false });
+        fs.writeFileSync(result.filePath, JSON.stringify(exportResult.data, null, 2));
         return { success: true, path: result.filePath };
       }
       
@@ -67,8 +68,8 @@ function registerDataHandlers(databaseService) {
 
   ipcMain.handle('load-data', async () => {
     try {
-      const data = await databaseService.exportData();
-      return { success: true, data };
+      const result = await databaseService.exportData({ showDialog: false });
+      return { success: true, data: result.data };
     } catch (error) {
       return { success: false, error: error.message };
     }

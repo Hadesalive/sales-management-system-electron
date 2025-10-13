@@ -10,15 +10,41 @@ export default function HomePage() {
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
   useEffect(() => {
-    // Check if onboarding has been completed
-    const onboardingCompleted = localStorage.getItem('onboarding_completed');
+    const checkOnboardingStatus = async () => {
+      try {
+        // Check if onboarding has been completed from database
+        if (typeof window !== 'undefined' && window.electronAPI) {
+          const electronAPI = window.electronAPI as Record<string, unknown>;
+          if ('getPreferences' in electronAPI && typeof electronAPI.getPreferences === 'function') {
+            const response = await (electronAPI.getPreferences as () => Promise<{ success: boolean; data?: { onboardingCompleted: boolean } }>)();
+            if (response && response.success && response.data) {
+              const preferences = response.data;
+              if (!preferences.onboardingCompleted) {
+                // Redirect to onboarding
+                router.push('/onboarding');
+              } else {
+                setCheckingOnboarding(false);
+              }
+            } else {
+              // Fallback: redirect to onboarding if we can't get preferences
+              router.push('/onboarding');
+            }
+          } else {
+            // Fallback: redirect to onboarding if method not available
+            router.push('/onboarding');
+          }
+        } else {
+          // Fallback: redirect to onboarding if we can't access electron
+          router.push('/onboarding');
+        }
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+        // Fallback: redirect to onboarding if we can't check
+        router.push('/onboarding');
+      }
+    };
     
-    if (!onboardingCompleted) {
-      // Redirect to onboarding
-      router.push('/onboarding');
-    } else {
-      setCheckingOnboarding(false);
-    }
+    checkOnboardingStatus();
   }, [router]);
 
   if (checkingOnboarding) {

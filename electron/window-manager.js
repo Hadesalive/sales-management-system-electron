@@ -60,18 +60,62 @@ function createMainWindow() {
     const app = express();
     const server = require('http').createServer(app);
     
-    // Serve static files from the out directory
-    app.use(express.static(path.join(__dirname, '../out')));
+    // IMPORTANT: Middleware to rewrite paths containing _next MUST be first
+    // (e.g., /onboarding/_next/... → /_next/...)
+    app.use((req, res, next) => {
+      if (req.path.includes('/_next/')) {
+        const nextIndex = req.path.indexOf('/_next/');
+        req.url = req.path.substring(nextIndex);
+        req.path = req.url;
+      }
+      next();
+    });
     
     // Map _next/static to the actual static directory
     app.use('/_next/static', express.static(path.join(__dirname, '../out/static')));
+    
+    // Serve other _next resources
+    app.use('/_next', express.static(path.join(__dirname, '../out')));
+    
+    // Serve static files from the out directory
+    app.use(express.static(path.join(__dirname, '../out')));
+    
+    // Serve the main HTML file from root
+    app.get('/', (req, res) => {
+      res.sendFile(path.join(__dirname, '../out/server/app/index.html'));
+    });
+    
+    // NUCLEAR OPTION: Always serve index.html for everything (except assets)
+    app.use((req, res, next) => {
+      console.log(`🔍 Request: ${req.method} ${req.path}`);
+      
+      // Skip if it's an API call or static asset
+      if (req.path.startsWith('/_next') || req.path.startsWith('/api')) {
+        console.log(`   → Skipping (static/API): ${req.path}`);
+        return next();
+      }
+      
+      // NUCLEAR: Always serve index.html - let React Router handle everything
+      const indexPath = path.join(__dirname, '../out/server/app/index.html');
+      if (fs.existsSync(indexPath)) {
+        console.log(`   → Serving index.html for: ${req.path}`);
+        return res.sendFile(indexPath);
+      }
+      
+      res.status(404).send('Not Found');
+    });
     
     // Start server on a random port
     const port = 0; // Let the system choose an available port
     server.listen(port, () => {
       const actualPort = server.address().port;
       console.log(`🌐 Serving production build on port ${actualPort}`);
-      mainWindow.loadURL(`http://localhost:${actualPort}/server/app/index.html`);
+      mainWindow.loadURL(`http://localhost:${actualPort}/`);
+    });
+    
+    // Handle server errors gracefully
+    server.on('error', (err) => {
+      console.error('Server error:', err.message);
     });
   }
 

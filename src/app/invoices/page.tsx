@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { AppLayout } from '@/components/layouts/app-layout';
 import { PaginatedTableCard, KPICard } from '@/components/ui/dashboard';
 import { Button, Toast } from '@/components/ui/core';
@@ -268,9 +269,11 @@ export default function InvoicesPage() {
         <Button variant="ghost" size="sm" onClick={() => handleEditInvoice(invoice.id)}>
           <PencilIcon className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => router.push(`/invoices/${invoice.id}`)}>
-          <ArrowDownTrayIcon className="h-4 w-4" />
-        </Button>
+        <Link href={`/invoices/${invoice.id}`}>
+          <Button variant="ghost" size="sm">
+            <ArrowDownTrayIcon className="h-4 w-4" />
+          </Button>
+        </Link>
         <Button 
           variant="ghost" 
           size="sm" 
