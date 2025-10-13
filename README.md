@@ -19,14 +19,24 @@ npm install
 
 ### Development
 ```bash
-npm run dev
+npm run electron-dev
 ```
-This starts both the Next.js dev server and Electron app automatically.
+This starts both the Vite dev server and Electron app automatically.
 
 ### Build for Production
 ```bash
 npm run build
+npm run electron-prod
 ```
+
+### Package Application
+```bash
+npm run pack:mac    # macOS
+npm run pack:win    # Windows
+npm run pack:linux  # Linux
+```
+
+See [PACKAGING-GUIDE.md](./PACKAGING-GUIDE.md) for detailed packaging instructions.
 
 ---
 
@@ -95,32 +105,25 @@ npm run build
 
 ## 🏗️ Technology Stack
 
-- **Frontend**: Next.js 14, React 18, TypeScript
-- **Desktop**: Electron
+- **Frontend**: React 19, Vite, TypeScript
+- **Routing**: React Router v7
+- **Desktop**: Electron 22
 - **Database**: SQLite (better-sqlite3)
-- **Styling**: TailwindCSS
-- **Charts**: Chart.js
-- **Icons**: Heroicons
-- **Forms**: Custom form components
+- **Styling**: TailwindCSS v4
+- **Charts**: Chart.js + react-chartjs-2
+- **Icons**: Heroicons v2
+- **PDF Generation**: html2canvas, jsPDF
 
 ---
 
 ## 📖 Documentation
 
-### **Complete System Documentation**
-See [`SYSTEM_DOCUMENTATION.md`](./SYSTEM_DOCUMENTATION.md) for:
-- Detailed architecture explanation
-- Database schema reference
-- Revenue & financial logic
-- Module documentation
-- API reference
-- Troubleshooting guide
-
-### **Settings Guide**
-See [`SETTINGS_README.md`](./SETTINGS_README.md) for:
-- Company settings configuration
-- User preferences
-- Theme customization
+### **Packaging Guide**
+See [`PACKAGING-GUIDE.md`](./PACKAGING-GUIDE.md) for:
+- Building installers for macOS/Windows/Linux
+- Distribution guidelines
+- Update strategies
+- Platform-specific requirements
 
 ---
 
@@ -153,22 +156,30 @@ Only cash and original payment refunds impact revenue
 ```
 topnotch-sales-manager/
 ├── electron/              # Electron main process
-│   ├── handlers/          # IPC handlers (10 modules)
+│   ├── handlers/          # IPC handlers
 │   ├── services/          # Database service
-│   └── main.js            # Entry point
+│   ├── schema/            # Database schema & migrations
+│   ├── main.js            # Entry point
+│   └── window-manager.js  # Window & routing
 ├── src/
-│   ├── app/               # Next.js pages (30+ pages)
-│   │   ├── customers/
-│   │   ├── products/
-│   │   ├── sales/
-│   │   ├── invoices/
-│   │   ├── orders/        # New
-│   │   ├── returns/       # New
-│   │   └── dashboard.tsx
+│   ├── pages/             # React Router pages (30+ pages)
+│   │   ├── CustomersPage.tsx
+│   │   ├── ProductsPage.tsx
+│   │   ├── SalesPage.tsx
+│   │   ├── InvoicesPage.tsx
+│   │   ├── OrdersPage.tsx
+│   │   ├── ReturnsPage.tsx
+│   │   └── DashboardPage.tsx
 │   ├── components/        # Reusable UI components
 │   ├── lib/               # Services, types, utilities
-│   └── contexts/          # React contexts
-├── topnotch-sales.db      # SQLite database
+│   ├── contexts/          # React contexts (Theme, Settings, Sales)
+│   ├── App.tsx            # Root component with routes
+│   └── main.tsx           # Vite entry point
+├── public/                # Static assets
+│   ├── Assets/            # Logos and images
+│   └── icon.*             # App icons
+├── dist/                  # Built frontend (gitignored)
+├── release/               # Packaged apps (gitignored)
 └── package.json
 ```
 
@@ -183,14 +194,17 @@ topnotch-sales-manager/
 ### Environment
 - Uses SQLite (no external database needed)
 - Electron for desktop deployment
-- Next.js for UI rendering
+- Vite for fast builds and HMR
+- React Router for client-side routing
 
 ### Key Commands
 ```bash
-npm run dev          # Start development
-npm run build        # Build for production
-npm run lint         # Run ESLint
-npm run electron     # Run Electron only
+npm run electron-dev  # Development with hot reload
+npm run build         # Build frontend (Vite)
+npm run electron-prod # Run production build
+npm run pack:mac      # Package for macOS
+npm run pack:win      # Package for Windows
+npm run pack:linux    # Package for Linux
 ```
 
 ---
