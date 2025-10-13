@@ -2,7 +2,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { createTables, createIndexes, migrateDatabase, initializeDefaultData } = require('../schema/sqlite-schema');
+const { createTables, migrateDatabase, initializeDefaultData } = require('../schema/sqlite-schema');
 
 // Try to use SQLite database instead of JSON file for consistency
 let sqlite3 = null;
@@ -279,7 +279,8 @@ function createSQLiteDatabaseService() {
         return rows.map(row => ({
           id: row.id,
           name: row.name,
-          description: row.description,
+          description: row.description || '',
+          preview: row.preview || '',
           colors: {
             primary: row.colors_primary,
             secondary: row.colors_secondary,
@@ -288,18 +289,19 @@ function createSQLiteDatabaseService() {
             text: row.colors_text
           },
           layout: {
-            headerStyle: row.layout_header_style,
-            showLogo: row.layout_show_logo,
-            showBorder: row.layout_show_border,
-            itemTableStyle: row.layout_item_table_style,
-            footerStyle: row.layout_footer_style
+            headerStyle: row.layout_header_style || 'classic',
+            showLogo: row.layout_show_logo !== 0,
+            showBorder: row.layout_show_border !== 0,
+            itemTableStyle: row.layout_item_table_style || 'simple',
+            footerStyle: row.layout_footer_style || 'minimal'
           },
           fonts: {
             primary: row.fonts_primary,
             secondary: row.fonts_secondary,
-            size: row.fonts_size
+            size: row.fonts_size || 'medium'
           },
-          isDefault: row.is_default,
+          customSchema: row.custom_schema ? JSON.parse(row.custom_schema) : undefined,
+          isDefault: row.is_default !== 0,
           createdAt: row.created_at,
           updatedAt: row.updated_at
         }));
@@ -316,7 +318,8 @@ function createSQLiteDatabaseService() {
           return {
             id: row.id,
             name: row.name,
-            description: row.description,
+            description: row.description || '',
+            preview: row.preview || '',
             colors: {
               primary: row.colors_primary,
               secondary: row.colors_secondary,
@@ -325,18 +328,19 @@ function createSQLiteDatabaseService() {
               text: row.colors_text
             },
             layout: {
-              headerStyle: row.layout_header_style,
-              showLogo: row.layout_show_logo,
-              showBorder: row.layout_show_border,
-              itemTableStyle: row.layout_item_table_style,
-              footerStyle: row.layout_footer_style
+              headerStyle: row.layout_header_style || 'classic',
+              showLogo: row.layout_show_logo !== 0,
+              showBorder: row.layout_show_border !== 0,
+              itemTableStyle: row.layout_item_table_style || 'simple',
+              footerStyle: row.layout_footer_style || 'minimal'
             },
             fonts: {
               primary: row.fonts_primary,
               secondary: row.fonts_secondary,
-              size: row.fonts_size
+              size: row.fonts_size || 'medium'
             },
-            isDefault: row.is_default,
+            customSchema: row.custom_schema ? JSON.parse(row.custom_schema) : undefined,
+            isDefault: row.is_default !== 0,
             createdAt: row.created_at,
             updatedAt: row.updated_at
           };
@@ -389,10 +393,16 @@ function createSQLiteDatabaseService() {
 
     async updateInvoiceTemplate(id, updates) {
       try {
+        console.log('SQLite: Updating invoice template ID:', id);
+        console.log('SQLite: Updates received:', JSON.stringify(updates, null, 2));
+        
         // Map template object fields to database columns
         const updateData = {};
         
         if (updates.name !== undefined) updateData.name = updates.name;
+        if (updates.description !== undefined) updateData.description = updates.description;
+        if (updates.preview !== undefined) updateData.preview = updates.preview;
+        if (updates.isDefault !== undefined) updateData.is_default = updates.isDefault ? 1 : 0;
         
         // Handle nested color fields
         if (updates.colors) {
@@ -407,31 +417,46 @@ function createSQLiteDatabaseService() {
         if (updates.fonts) {
           if (updates.fonts.primary) updateData.fonts_primary = updates.fonts.primary;
           if (updates.fonts.secondary) updateData.fonts_secondary = updates.fonts.secondary;
-          // Note: fonts.size is not stored in DB schema - ignoring it
+          if (updates.fonts.size) updateData.fonts_size = updates.fonts.size;
         }
         
         // Handle nested layout fields
         if (updates.layout) {
           if (updates.layout.showLogo !== undefined) updateData.layout_show_logo = updates.layout.showLogo ? 1 : 0;
           if (updates.layout.showBorder !== undefined) updateData.layout_show_border = updates.layout.showBorder ? 1 : 0;
-          // Note: headerStyle, itemTableStyle, footerStyle are not stored in DB schema - ignoring them
+          if (updates.layout.headerStyle) updateData.layout_header_style = updates.layout.headerStyle;
+          if (updates.layout.itemTableStyle) updateData.layout_item_table_style = updates.layout.itemTableStyle;
+          if (updates.layout.footerStyle) updateData.layout_footer_style = updates.layout.footerStyle;
         }
         
-        // Ignore fields that don't exist in the database
-        // (description, preview, isDefault, etc.)
+        // Handle custom schema (store as JSON string)
+        if (updates.customSchema !== undefined) {
+          updateData.custom_schema = updates.customSchema ? JSON.stringify(updates.customSchema) : null;
+        }
         
         const fields = Object.keys(updateData);
+        console.log('SQLite: Mapped fields to update:', fields);
+        console.log('SQLite: Update data:', updateData);
+        
         if (fields.length === 0) {
           // No valid fields to update, just return current template
+          console.log('SQLite: No valid fields to update, returning current template');
           return this.getInvoiceTemplateById(id);
         }
         
         const values = fields.map(field => updateData[field]);
         const setClause = fields.map(field => `${field} = ?`).join(', ');
-        const stmt = db.prepare(`UPDATE invoice_templates SET ${setClause}, updated_at = ? WHERE id = ?`);
-
-        stmt.run(...values, new Date().toISOString(), id);
-        return this.getInvoiceTemplateById(id);
+        const query = `UPDATE invoice_templates SET ${setClause}, updated_at = ? WHERE id = ?`;
+        console.log('SQLite: Executing query:', query);
+        console.log('SQLite: With values:', [...values, new Date().toISOString(), id]);
+        
+        const stmt = db.prepare(query);
+        const result = stmt.run(...values, new Date().toISOString(), id);
+        console.log('SQLite: Update result:', result);
+        
+        const updatedTemplate = this.getInvoiceTemplateById(id);
+        console.log('SQLite: Updated template:', updatedTemplate);
+        return updatedTemplate;
       } catch (error) {
         console.error('Error updating invoice template:', error);
         throw error;
@@ -1353,9 +1378,6 @@ function createSQLiteDatabaseService() {
 
         // Step 3: Create backup of CURRENT data before import
         console.log('💾 Creating backup of current data...');
-        const currentData = await this.exportData({ showDialog: false, autoSave: true, savePath: backupPath });
-        console.log('✅ Backup created:', backupPath);
-
         // Step 4: Confirm with user (they might not realize this will replace ALL data)
         const confirmResult = await dialog.showMessageBox({
           type: 'warning',

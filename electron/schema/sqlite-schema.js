@@ -90,6 +90,8 @@ function createTables(db) {
     CREATE TABLE IF NOT EXISTS invoice_templates (
       id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
       name TEXT NOT NULL,
+      description TEXT,
+      preview TEXT,
       colors_primary TEXT NOT NULL,
       colors_secondary TEXT NOT NULL,
       colors_accent TEXT NOT NULL,
@@ -97,8 +99,14 @@ function createTables(db) {
       colors_text TEXT NOT NULL,
       fonts_primary TEXT NOT NULL,
       fonts_secondary TEXT NOT NULL,
+      fonts_size TEXT DEFAULT 'medium',
+      layout_header_style TEXT DEFAULT 'classic',
       layout_show_logo INTEGER NOT NULL DEFAULT 1,
       layout_show_border INTEGER NOT NULL DEFAULT 1,
+      layout_item_table_style TEXT DEFAULT 'simple',
+      layout_footer_style TEXT DEFAULT 'minimal',
+      custom_schema TEXT,
+      is_default INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -286,6 +294,31 @@ function migrateDatabase(db) {
       console.log('Migration note:', error.message);
     }
   }
+  
+  // Add new invoice template columns if they don't exist
+  const templateColumns = [
+    { name: 'description', type: 'TEXT', default: null },
+    { name: 'preview', type: 'TEXT', default: null },
+    { name: 'fonts_size', type: 'TEXT', default: "'medium'" },
+    { name: 'layout_header_style', type: 'TEXT', default: "'classic'" },
+    { name: 'layout_item_table_style', type: 'TEXT', default: "'simple'" },
+    { name: 'layout_footer_style', type: 'TEXT', default: "'minimal'" },
+    { name: 'custom_schema', type: 'TEXT', default: null },
+    { name: 'is_default', type: 'INTEGER', default: '0' }
+  ];
+  
+  templateColumns.forEach(column => {
+    try {
+      const alterQuery = `ALTER TABLE invoice_templates ADD COLUMN ${column.name} ${column.type}${column.default ? ` DEFAULT ${column.default}` : ''}`;
+      db.exec(alterQuery);
+      console.log(`✅ Added ${column.name} column to invoice_templates`);
+    } catch (error) {
+      // Column already exists, ignore error
+      if (!error.message.includes('duplicate column name')) {
+        console.log(`Migration note for ${column.name}:`, error.message);
+      }
+    }
+  });
 }
 
 function createIndexes(db) {
@@ -370,6 +403,136 @@ function initializeDefaultData(db) {
       VALUES (?, ?, ?, ?, ?, ?)
     `).run('TopNotch Electronics', '', '', '', 0.15, 'USD');
     console.log('✅ Default company settings created');
+  }
+  
+  // Insert default invoice templates if none exist
+  const existingTemplates = db.prepare('SELECT COUNT(*) as count FROM invoice_templates').get();
+  if (existingTemplates.count === 0) {
+    const defaultTemplates = [
+      {
+        id: 'pro-corporate',
+        name: 'Pro Corporate',
+        description: 'Clean corporate with balanced header and easy-to-scan table',
+        preview: 'pro-corporate-preview',
+        colors_primary: '#1f2937',
+        colors_secondary: '#6b7280',
+        colors_accent: '#3b82f6',
+        colors_background: '#ffffff',
+        colors_text: '#111827',
+        fonts_primary: 'Inter',
+        fonts_secondary: 'Inter',
+        fonts_size: 'medium',
+        layout_header_style: 'classic',
+        layout_show_logo: 1,
+        layout_show_border: 1,
+        layout_item_table_style: 'detailed',
+        layout_footer_style: 'detailed',
+        is_default: 1
+      },
+      {
+        id: 'modern-stripe',
+        name: 'Modern Stripe',
+        description: 'Bold accent stripe with modern typography',
+        preview: 'modern-stripe-preview',
+        colors_primary: '#0f172a',
+        colors_secondary: '#475569',
+        colors_accent: '#8b5cf6',
+        colors_background: '#ffffff',
+        colors_text: '#0f172a',
+        fonts_primary: 'Inter',
+        fonts_secondary: 'Inter',
+        fonts_size: 'medium',
+        layout_header_style: 'modern',
+        layout_show_logo: 1,
+        layout_show_border: 1,
+        layout_item_table_style: 'modern',
+        layout_footer_style: 'minimal',
+        is_default: 0
+      },
+      {
+        id: 'minimal-outline',
+        name: 'Minimal Outline',
+        description: 'Clean minimal design with subtle borders',
+        preview: 'minimal-outline-preview',
+        colors_primary: '#111827',
+        colors_secondary: '#6b7280',
+        colors_accent: '#10b981',
+        colors_background: '#ffffff',
+        colors_text: '#111827',
+        fonts_primary: 'Inter',
+        fonts_secondary: 'Inter',
+        fonts_size: 'medium',
+        layout_header_style: 'minimal',
+        layout_show_logo: 1,
+        layout_show_border: 1,
+        layout_item_table_style: 'simple',
+        layout_footer_style: 'minimal',
+        is_default: 0
+      },
+      {
+        id: 'elegant-dark',
+        name: 'Elegant Dark',
+        description: 'Sophisticated dark theme with gold accents',
+        preview: 'elegant-dark-preview',
+        colors_primary: '#1e293b',
+        colors_secondary: '#64748b',
+        colors_accent: '#f59e0b',
+        colors_background: '#0f172a',
+        colors_text: '#f1f5f9',
+        fonts_primary: 'Inter',
+        fonts_secondary: 'Inter',
+        fonts_size: 'medium',
+        layout_header_style: 'premium',
+        layout_show_logo: 1,
+        layout_show_border: 1,
+        layout_item_table_style: 'detailed',
+        layout_footer_style: 'detailed',
+        is_default: 0
+      },
+      {
+        id: 'classic-column',
+        name: 'Classic Column',
+        description: 'Traditional two-column layout',
+        preview: 'classic-column-preview',
+        colors_primary: '#374151',
+        colors_secondary: '#9ca3af',
+        colors_accent: '#ef4444',
+        colors_background: '#ffffff',
+        colors_text: '#1f2937',
+        fonts_primary: 'Inter',
+        fonts_secondary: 'Inter',
+        fonts_size: 'medium',
+        layout_header_style: 'classic',
+        layout_show_logo: 1,
+        layout_show_border: 1,
+        layout_item_table_style: 'simple',
+        layout_footer_style: 'minimal',
+        is_default: 0
+      }
+    ];
+    
+    const stmt = db.prepare(`
+      INSERT INTO invoice_templates (
+        id, name, description, preview,
+        colors_primary, colors_secondary, colors_accent, colors_background, colors_text,
+        fonts_primary, fonts_secondary, fonts_size,
+        layout_header_style, layout_show_logo, layout_show_border, layout_item_table_style, layout_footer_style,
+        is_default, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const now = new Date().toISOString();
+    for (const template of defaultTemplates) {
+      stmt.run(
+        template.id, template.name, template.description, template.preview,
+        template.colors_primary, template.colors_secondary, template.colors_accent, template.colors_background, template.colors_text,
+        template.fonts_primary, template.fonts_secondary, template.fonts_size,
+        template.layout_header_style, template.layout_show_logo, template.layout_show_border, template.layout_item_table_style, template.layout_footer_style,
+        template.is_default, now, now
+      );
+    }
+    
+    console.log('✅ Default invoice templates created');
   }
 }
 

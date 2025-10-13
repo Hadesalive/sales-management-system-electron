@@ -1,7 +1,5 @@
-'use client';
-
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { 
   DashboardLayout, 
   DashboardHeader, 
@@ -11,15 +9,12 @@ import {
 import { defaultSidebarItems } from '@/components/ui/dashboard/dashboard-sidebar';
 import { useDarkMode } from '@/lib/hooks/useDarkMode';
 
-interface AppLayoutProps {
-  children: React.ReactNode;
-}
-
-function AppLayoutContent({ children }: AppLayoutProps) {
+function AppLayoutContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [pageTitle, setPageTitle] = useState('TopNotch Sales Manager');
-  const pathname = usePathname();
-  const router = useRouter();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const pathname = location.pathname;
   
   // Apply dark mode from settings
   useDarkMode();
@@ -72,7 +67,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
 
     const route = routeMap[name];
     if (route && route !== pathname) {
-      router.push(route);
+      navigate(route);
     }
     setIsMobileMenuOpen(false);
   };
@@ -192,15 +187,15 @@ function AppLayoutContent({ children }: AppLayoutProps) {
         </MobileDrawer>
       }
     >
-      {children}
+      <Outlet />
     </DashboardLayout>
   );
 }
 
-export function AppLayout({ children }: AppLayoutProps) {
+export function AppLayout() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <AppLayoutContent>{children}</AppLayoutContent>
+      <AppLayoutContent />
     </Suspense>
   );
 }

@@ -16,7 +16,6 @@ import {
   ChevronRightIcon,
   DocumentTextIcon} from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
-import Image from "next/image";
 
 // Types for sidebar items
 interface SubMenuItem {
@@ -139,13 +138,11 @@ export function DashboardSidebar({
       }}
     >
       <div className="h-12 flex items-center mb-2 px-1">
-        <Image
+        <img
           key={theme === 'dark' ? "dark" : "light"}
           src={theme === 'dark' ? "/Assets/topnotch-logo-light.png" : "/Assets/topnotch-logo-dark.png"}
           alt="TopNotch Electronics"
-          width={120}
-          height={120}
-          className="h-16 sm:h-20 md:h-24 lg:h-28 xl:h-32 w-auto"
+          className="h-16 sm:h-20 md:h-24 lg:h-28 xl:h-32 w-auto object-contain"
         />
       </div>
       <nav className="space-y-0.5 mt-2">
@@ -158,12 +155,17 @@ export function DashboardSidebar({
             <div key={item.name}>
               <button
                 onClick={() => handleItemClick(item)}
-                className={`relative w-full flex items-center gap-3 pl-4 pr-3 py-2.5 rounded-md text-left transition-colors duration-200 text-[--color-foreground] text-sm md:text-[15px]`}
+                className={`relative w-full flex items-center gap-3 pl-4 pr-3 py-2.5 rounded-md text-left transition-colors duration-200 text-[--color-foreground] text-sm md:text-[15px] hover:bg-[var(--muted)]`}
+                style={{ backgroundColor: isActive ? 'var(--muted)' : 'transparent' }}
                 aria-current={isActive ? "page" : undefined}
               >
                 <span 
                   className="absolute left-1 top-1/2 -translate-y-1/2 h-6 rounded-full transition-all duration-300" 
-                  style={{ width: isActive ? '3px' : '0px', background: 'var(--accent)' }} 
+                  style={{ 
+                    width: isActive ? '3px' : '0px', 
+                    background: 'var(--accent)',
+                    opacity: isActive ? 1 : 0
+                  }} 
                 />
                 {hasSubMenus && (
                   <span className="flex-shrink-0">

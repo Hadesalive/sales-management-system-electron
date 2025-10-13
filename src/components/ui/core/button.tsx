@@ -27,10 +27,14 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           className
         )}
         style={{
-          backgroundColor: variant === "outline" ? 'var(--background)' :
+          backgroundColor: variant === "default" ? 'var(--accent)' :
+                          variant === "destructive" ? 'var(--destructive)' :
+                          variant === "outline" ? 'transparent' :
                           variant === "secondary" ? 'var(--muted)' : 
                           variant === "ghost" || variant === "link" ? 'transparent' : undefined,
-          color: variant === "outline" || variant === "secondary" ? 'var(--foreground)' :
+          color: variant === "default" ? 'var(--accent-contrast)' :
+                 variant === "destructive" ? 'white' :
+                 variant === "outline" || variant === "secondary" ? 'var(--foreground)' :
                  variant === "link" ? '#ea580c' : 
                  variant === "ghost" ? 'var(--foreground)' : undefined,
           border: variant === "outline" ? '1px solid var(--border)' : undefined,

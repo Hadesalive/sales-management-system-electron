@@ -178,6 +178,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   const getCurrencySymbol = (): string => {
     const currencyMap: Record<string, string> = {
       'NLE': 'Le',
+      'NLe': 'NLe', // New Leones
       'USD': '$',
       'EUR': '€',
       'GBP': '£',
