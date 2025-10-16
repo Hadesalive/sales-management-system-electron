@@ -48,3 +48,4 @@ topnotch-sales.db*
 
 # development port file
 .dev-port
+release/
