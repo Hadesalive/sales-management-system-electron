@@ -9,8 +9,8 @@ export class CustomerService extends BaseService {
   async getAllCustomers(): Promise<ApiResponse<Customer[]>> {
     try {
       // Use Electron IPC to get customers
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-customers') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getCustomers() as {
           success: boolean;
           data?: Customer[];
           error?: string;
@@ -33,8 +33,8 @@ export class CustomerService extends BaseService {
   async getCustomerById(id: string): Promise<ApiResponse<Customer | null>> {
     try {
       // Use Electron IPC to get customer by ID
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-customer-by-id', id) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getCustomerById(id) as {
           success: boolean;
           data?: Customer | null;
           error?: string;
@@ -63,8 +63,8 @@ export class CustomerService extends BaseService {
       }
 
       // Use Electron IPC to create customer
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('create-customer', customerData) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.createCustomer(customerData) as {
           success: boolean;
           data?: Customer;
           error?: string;
@@ -87,8 +87,8 @@ export class CustomerService extends BaseService {
   async updateCustomer(id: string, updates: Partial<Customer>): Promise<ApiResponse<Customer>> {
     try {
       // Use Electron IPC to update customer
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('update-customer', { id, updates }) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.updateCustomer(id, updates) as {
           success: boolean;
           data?: Customer;
           error?: string;
@@ -111,8 +111,8 @@ export class CustomerService extends BaseService {
   async deleteCustomer(id: string): Promise<ApiResponse<boolean>> {
     try {
       // Use Electron IPC to delete customer
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('delete-customer', id) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.deleteCustomer(id) as {
           success: boolean;
           error?: string;
         };
@@ -134,8 +134,8 @@ export class CustomerService extends BaseService {
   async searchCustomers(query: string): Promise<ApiResponse<Customer[]>> {
     try {
       // Use Electron IPC to search customers
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('search-customers', query) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.searchCustomers(query) as {
           success: boolean;
           data?: Customer[];
           error?: string;
@@ -158,8 +158,8 @@ export class CustomerService extends BaseService {
   async getCustomersPaginated(page: number = 1, limit: number = 10): Promise<ApiResponse<PaginatedResponse<Customer>>> {
     try {
       // Use Electron IPC to get all customers and paginate
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-customers') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getCustomers() as {
           success: boolean;
           data?: Customer[];
           error?: string;
@@ -194,8 +194,8 @@ export class CustomerService extends BaseService {
   async exportCustomers(): Promise<ApiResponse<{ path: string; count: number }>> {
     try {
       // Use Electron IPC for file export
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const response = await window.electron.ipcRenderer.invoke('export-data') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const response = await window.electronAPI.exportData() as {
           success: boolean;
           path?: string;
           error?: string;
@@ -203,7 +203,7 @@ export class CustomerService extends BaseService {
         
         if (response.success && response.path) {
           // Get customer count for reporting
-          const customersResult = await window.electron.ipcRenderer.invoke('get-customers') as {
+          const customersResult = await window.electronAPI.getCustomers() as {
             success: boolean;
             data?: Customer[];
           };
@@ -225,8 +225,8 @@ export class CustomerService extends BaseService {
   async importCustomers(): Promise<ApiResponse<{ importedCount: number; totalCount: number }>> {
     try {
       // Use Electron IPC for file import
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const response = await window.electron.ipcRenderer.invoke('import-data') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const response = await window.electronAPI.importData() as {
           success: boolean;
           data?: { customers?: Customer[] };
           error?: string;
@@ -236,7 +236,7 @@ export class CustomerService extends BaseService {
           const importedCount = response.data?.customers?.length || 0;
           
           // Get current customer count
-          const customersResult = await window.electron.ipcRenderer.invoke('get-customers') as {
+          const customersResult = await window.electronAPI.getCustomers() as {
             success: boolean;
             data?: Customer[];
           };
@@ -258,8 +258,8 @@ export class CustomerService extends BaseService {
   async getActiveCustomers(): Promise<ApiResponse<Customer[]>> {
     try {
       // Use Electron IPC to get all customers and filter for active ones
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-customers') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getCustomers() as {
           success: boolean;
           data?: Customer[];
           error?: string;
@@ -293,8 +293,8 @@ export class CustomerService extends BaseService {
   }>> {
     try {
       // Use Electron IPC to get customer stats
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-customer-stats') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getCustomerStats() as {
           success: boolean;
           data?: {
             total: number;

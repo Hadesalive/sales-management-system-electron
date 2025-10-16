@@ -19,7 +19,8 @@
     "pack:win": "npm run build && electron-builder --win",
     "pack:linux": "npm run build && electron-builder --linux",
     "pack:all": "npm run build && electron-builder -mwl",
-    "preelectron-pack": "npm run build"
+    "preelectron-pack": "npm run build && npm run postinstall",
+    "postinstall": "npx electron-rebuild"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -60,6 +61,7 @@
     "cross-env": "^10.0.0",
     "electron": "^22.0.0",
     "electron-builder": "^26.0.12",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
     "tailwindcss": "^4",
@@ -81,15 +83,36 @@
       "!node_modules/.cache",
       "!**/*.map"
     ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "asar": false,
+    "buildDependenciesFromSource": false,
     "extraResources": [
       {
-        "from": "public/Assets",
-        "to": "Assets",
-        "filter": ["**/*"]
+        "from": "public/images",
+        "to": "images",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "public/icon.ico",
       "artifactName": "${productName}-${version}-Setup.${ext}"
     },
@@ -103,7 +126,10 @@
       "deleteAppDataOnUninstall": false
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "public/icon.icns",
       "category": "public.app-category.business",
       "hardenedRuntime": true,
@@ -125,7 +151,10 @@
       ]
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "public/icon.png",
       "category": "Office",
       "artifactName": "${productName}-${version}.${ext}"

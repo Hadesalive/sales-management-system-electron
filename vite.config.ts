@@ -13,6 +13,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    assetsDir: 'assets', // Use lowercase assets folder
+    copyPublicDir: true,
   },
   base: './', // Important for Electron
+  publicDir: 'public', // Explicitly set public directory
 })

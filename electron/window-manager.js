@@ -60,12 +60,34 @@ function createMainWindow() {
     const app = express();
     const server = require('http').createServer(app);
     
-    // Serve static files from Vite build output
-    app.use(express.static(path.join(__dirname, '../dist')));
+    // Get the correct path to dist folder (works both in dev and packaged app)
+    const { app: electronApp } = require('electron');
+    const distPath = isDev 
+      ? path.join(__dirname, '../dist')
+      : path.join(electronApp.getAppPath(), 'dist');
+    
+    console.log('Production dist path:', distPath);
+    console.log('Dist exists:', fs.existsSync(distPath));
+    if (fs.existsSync(distPath)) {
+      console.log('Dist contents:', fs.readdirSync(distPath));
+    }
+    
+    // Serve static files from Vite build output with proper MIME types
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        } else if (filePath.endsWith('.css')) {
+          res.setHeader('Content-Type', 'text/css');
+        } else if (filePath.endsWith('.html')) {
+          res.setHeader('Content-Type', 'text/html');
+        }
+      }
+    }));
     
     // SPA fallback: serve index.html for all non-static routes (React Router handles routing)
     app.use((req, res) => {
-      res.sendFile(path.join(__dirname, '../dist/index.html'));
+      res.sendFile(path.join(distPath, 'index.html'));
     });
     
     // Start server on a random port
@@ -74,6 +96,9 @@ function createMainWindow() {
       const actualPort = server.address().port;
       console.log(`🌐 Serving production build on port ${actualPort}`);
       mainWindow.loadURL(`http://localhost:${actualPort}/`);
+      
+      // Open DevTools in production to debug (remove this later)
+      mainWindow.webContents.openDevTools();
     });
     
     // Handle server errors gracefully

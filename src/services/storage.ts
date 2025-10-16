@@ -1,23 +1,5 @@
 import { SalesData, Customer, Product, Sale, CompanySettings } from '@/types';
 
-// Declare global electronAPI for TypeScript
-declare global {
-  interface Window {
-    electronAPI: {
-      saveData: (data: SalesData) => Promise<{ success: boolean; error?: string }>;
-      loadData: () => Promise<{ success: boolean; data?: SalesData; error?: string }>;
-      exportData: () => Promise<{ success: boolean; path?: string; error?: string }>;
-      importData: () => Promise<{ success: boolean; data?: SalesData; error?: string }>;
-      onMenuNewSale: (callback: () => void) => void;
-      onMenuNewCustomer: (callback: () => void) => void;
-      onMenuNewProduct: (callback: () => void) => void;
-      onMenuExportData: (callback: () => void) => void;
-      onMenuImportData: (callback: () => void) => void;
-      removeAllListeners: (channel: string) => void;
-    };
-  }
-}
-
 class StorageService {
   private data: SalesData | null = null;
   private listeners: Array<(data: SalesData) => void> = [];

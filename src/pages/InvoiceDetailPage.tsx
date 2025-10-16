@@ -122,7 +122,7 @@ export default function InvoiceDetailsPage() {
   // Editable header/footer state
   const [isEditingHeader, setIsEditingHeader] = useState(false);
   const [isEditingFooter, setIsEditingFooter] = useState(false);
-  const [companyLogo, setCompanyLogo] = useState<string>('/Assets/topnotch-logo-dark.png');
+  const [companyLogo, setCompanyLogo] = useState<string>('/images/topnotch-logo-dark.png');
   const [brandLogos, setBrandLogos] = useState<string[]>([
     '/logo/Apple-Logo.png',
     '/logo/samsung-Logo.png',
@@ -148,7 +148,7 @@ export default function InvoiceDetailsPage() {
     phone: companySettings.phone || "+1 (555) 123-4567",
     email: companySettings.email || "info@topnotch.com",
     website: "www.topnotch.com", // Not in settings, use default
-    logo: "/Assets/topnotch-logo-dark.png"
+    logo: "/images/topnotch-logo-dark.png"
   };
   
   // Editable footer content

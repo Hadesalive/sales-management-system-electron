@@ -2,12 +2,47 @@
 const { ipcMain } = require('electron');
 
 function registerSalesHandlers(databaseService) {
+  console.log('🔧 registerSalesHandlers called with databaseService:', !!databaseService);
+  
+  // Check what methods are available on databaseService
+  if (databaseService) {
+    console.log('🔧 databaseService methods:', Object.getOwnPropertyNames(databaseService));
+    console.log('🔧 databaseService.getSales exists:', typeof databaseService.getSales);
+    console.log('🔧 databaseService constructor:', databaseService.constructor.name);
+  } else {
+    console.error('❌ databaseService is null/undefined');
+  }
+
+  // TEST: Simple IPC handler to verify IPC is working
+  ipcMain.handle('test-sales-ipc', async () => {
+    console.log('🔧 TEST: Simple IPC handler called successfully!');
+    return { success: true, message: 'IPC is working!' };
+  });
+  
   // Sales-related IPC handlers
   ipcMain.handle('get-sales', async () => {
     try {
+      console.log('🔧 get-sales IPC handler called');
+      
+      // Safety check: ensure databaseService is available and has getSales method
+      if (!databaseService) {
+        console.error('❌ databaseService is null in get-sales handler');
+        return { success: false, error: 'Database service not available' };
+      }
+      
+      if (typeof databaseService.getSales !== 'function') {
+        console.error('❌ databaseService.getSales is not a function');
+        console.log('Available methods:', Object.getOwnPropertyNames(databaseService));
+        return { success: false, error: 'getSales method not available on database service' };
+      }
+      
+      console.log('🔧 Calling databaseService.getSales()');
       const sales = await databaseService.getSales();
-      return { success: true, data: sales };
+      console.log('🔧 get-sales result:', sales?.length || 0, 'sales');
+      
+      return { success: true, data: sales || [] };
     } catch (error) {
+      console.error('🔧 get-sales error:', error);
       return { success: false, error: error.message };
     }
   });

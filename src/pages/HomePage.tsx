@@ -7,41 +7,12 @@ export default function HomePage() {
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      try {
-        // Check if onboarding has been completed from database
-        if (typeof window !== 'undefined' && window.electronAPI) {
-          const electronAPI = window.electronAPI as Record<string, unknown>;
-          if ('getPreferences' in electronAPI && typeof electronAPI.getPreferences === 'function') {
-            const response = await (electronAPI.getPreferences as () => Promise<{ success: boolean; data?: { onboardingCompleted: boolean } }>)();
-            if (response && response.success && response.data) {
-              const preferences = response.data;
-              if (!preferences.onboardingCompleted) {
-                // Redirect to onboarding
-                navigate('/onboarding');
-              } else {
-                setCheckingOnboarding(false);
-              }
-            } else {
-              // Fallback: redirect to onboarding if we can't get preferences
-              navigate('/onboarding');
-            }
-          } else {
-            // Fallback: redirect to onboarding if method not available
-            navigate('/onboarding');
-          }
-        } else {
-          // Fallback: redirect to onboarding if we can't access electron
-          navigate('/onboarding');
-        }
-      } catch (error) {
-        console.error('Error checking onboarding status:', error);
-        // Fallback: redirect to onboarding if we can't check
-        navigate('/onboarding');
-      }
-    };
+    // Onboarding disabled for now - go straight to dashboard
+    setCheckingOnboarding(false);
     
-    checkOnboardingStatus();
+    // TODO: Re-enable onboarding later
+    // const checkOnboardingStatus = async () => { ... };
+    // checkOnboardingStatus();
   }, [navigate]);
 
   if (checkingOnboarding) {

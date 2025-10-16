@@ -8,43 +8,152 @@ const { createTables, migrateDatabase, initializeDefaultData } = require('../sch
 let sqlite3 = null;
 try {
   sqlite3 = require('better-sqlite3');
-} catch {
-  console.log('better-sqlite3 not available, falling back to JSON file storage');
+  console.log('✅ better-sqlite3 loaded successfully');
+  console.log('better-sqlite3 version:', sqlite3.VERSION);
+  console.log('better-sqlite3 path:', require.resolve('better-sqlite3'));
+} catch (error) {
+  console.log('❌ better-sqlite3 not available:', error.message);
+  console.log('Error details:', error);
+  console.log('Falling back to JSON file storage');
 }
 
 function createSQLiteDatabaseService() {
-  console.log('Creating SQLite database service');
+  console.log('🔧 Creating SQLite database service');
+  console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
+  console.log('🔧 sqlite3 available:', !!sqlite3);
+  console.log('🔧 sqlite3 type:', typeof sqlite3);
 
   // Determine database path based on environment
   let dbPath;
+  console.log('🔧 NODE_ENV check:', process.env.NODE_ENV);
+  console.log('🔧 NODE_ENV === "production":', process.env.NODE_ENV === 'production');
+  
   if (process.env.NODE_ENV === 'production') {
     // Production: use user data directory
-    const { app } = require('electron');
-    dbPath = path.join(app.getPath('userData'), 'topnotch-sales.db');
-    console.log('Production mode: Database in user data directory');
+    console.log('🔧 Production mode: Database in user data directory');
+    
+    // Try different database paths as fallbacks
+    const possiblePaths = [];
+    
+    // Try to get user data path from Electron app if available
+    try {
+      const { app } = require('electron');
+      console.log('🔧 App is ready:', app.isReady());
+      console.log('🔧 App name:', app.getName());
+      console.log('🔧 App version:', app.getVersion());
+      
+      if (app.isReady()) {
+        const userDataPath = app.getPath('userData');
+        console.log('🔧 User data path:', userDataPath);
+        possiblePaths.push(path.join(userDataPath, 'topnotch-sales.db'));
+        possiblePaths.push(path.join(userDataPath, 'database.db'));
+      } else {
+        console.log('⚠️ App not ready, using fallback paths');
+      }
+    } catch (error) {
+      console.log('⚠️ Could not access Electron app:', error.message);
+    }
+    
+    // Add fallback paths in user's home directory (these should always work)
+    possiblePaths.push(path.join(os.homedir(), 'Library', 'Application Support', 'TopNotch Sales Manager', 'topnotch-sales.db'));
+    possiblePaths.push(path.join(os.homedir(), 'TopNotch Sales Manager', 'topnotch-sales.db'));
+    possiblePaths.push(path.join(os.homedir(), '.topnotch-sales-manager', 'topnotch-sales.db'));
+    
+    console.log('🔧 Possible database paths:', possiblePaths);
+    
+    let workingPath = null;
+    for (const testPath of possiblePaths) {
+      try {
+        console.log('🔧 Testing database path:', testPath);
+        
+        // Ensure directory exists
+        const dir = path.dirname(testPath);
+        if (!fs.existsSync(dir)) {
+          console.log('🔧 Creating directory:', dir);
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        
+        // Test if we can write to the directory
+        const testFile = path.join(dir, 'test-write.tmp');
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+        
+        workingPath = testPath;
+        console.log('✅ Found working database path:', workingPath);
+        break;
+      } catch (error) {
+        console.log('❌ Path not writable:', testPath, error.message);
+        continue;
+      }
+    }
+    
+    if (!workingPath) {
+      throw new Error('Cannot find a writable directory for the database. Tried paths: ' + possiblePaths.join(', '));
+    }
+    
+    dbPath = workingPath;
+    console.log('🔧 Final database path:', dbPath);
   } else {
     // Development: use project root
+    console.log('🔧 Development mode: Database in project root');
+    console.log('🔧 Current working directory:', process.cwd());
     dbPath = path.join(process.cwd(), 'topnotch-sales.db');
-    console.log('Development mode: Database in project root');
+    console.log('🔧 Database path:', dbPath);
   }
-  console.log('Database path:', dbPath);
+  
+  console.log('🔧 Final dbPath before SQLite:', dbPath);
 
   if (!sqlite3) {
-    console.log('better-sqlite3 not available, throwing error');
+    console.log('❌ better-sqlite3 not available, throwing error');
     throw new Error('better-sqlite3 not available');
   }
 
-  console.log('Opening SQLite database...');
-  const db = sqlite3(dbPath);
-  console.log('SQLite database opened successfully');
+  console.log('🔧 Opening SQLite database...');
+  let db;
+  try {
+    // Try to open the database with better error handling
+    db = sqlite3(dbPath, { 
+      verbose: console.log // Enable verbose logging for debugging
+    });
+    console.log('✅ SQLite database opened successfully');
+    
+    // Test if the database is actually working
+    db.prepare('SELECT 1').get();
+    console.log('✅ SQLite database is functional');
+  } catch (error) {
+    console.error('❌ Failed to open SQLite database:', error);
+    console.error('❌ Database path:', dbPath);
+    console.error('❌ Error details:', {
+      message: error.message,
+      code: error.code,
+      errno: error.errno
+    });
+    
+    // Provide more specific error messages
+    if (error.code === 'SQLITE_CANTOPEN') {
+      throw new Error(`Cannot open database file at ${dbPath}. This is usually a permissions issue or the directory doesn't exist.`);
+    } else if (error.code === 'SQLITE_NOTADB') {
+      throw new Error(`File at ${dbPath} exists but is not a valid SQLite database.`);
+    } else {
+      throw new Error(`Database error: ${error.message}`);
+    }
+  }
 
   return {
     async initialize() {
-      // Use shared schema for consistency
-      createTables(db);
-      migrateDatabase(db);
-      initializeDefaultData(db);
-      return Promise.resolve();
+      try {
+        console.log('Creating database tables from development schema...');
+        createTables(db);
+        console.log('Running database migrations...');
+        migrateDatabase(db);
+        console.log('Initializing default data...');
+        initializeDefaultData(db);
+        console.log('✅ Database initialization complete');
+        return Promise.resolve();
+      } catch (error) {
+        console.error('❌ Database initialization failed:', error);
+        throw error;
+      }
     },
 
     close() {
@@ -1661,6 +1770,8 @@ function createSQLiteDatabaseService() {
 
     async updatePreferences(updates) {
       try {
+        console.log('SQLite: Updating preferences with:', updates);
+        
         const updateFields = [];
         const updateValues = [];
 
@@ -1698,6 +1809,7 @@ function createSQLiteDatabaseService() {
         }
 
         if (updateFields.length === 0) {
+          console.log('SQLite: No valid fields to update in preferences');
           return null;
         }
 
@@ -1705,11 +1817,18 @@ function createSQLiteDatabaseService() {
         updateValues.push(1); // WHERE id = 1
 
         const sql = `UPDATE company_settings SET ${updateFields.join(', ')}, updated_at = ? WHERE id = ?`;
+        console.log('SQLite: Executing preferences update:', sql);
+        console.log('SQLite: With values:', updateValues);
+        
         const result = db.prepare(sql).run(...updateValues);
+        console.log('SQLite: Preferences update result:', result);
 
         if (result.changes > 0) {
-          return await this.getPreferences();
+          const updatedPrefs = await this.getPreferences();
+          console.log('SQLite: Preferences after update:', updatedPrefs);
+          return updatedPrefs;
         }
+        console.log('SQLite: No rows updated in preferences');
         return null;
       } catch (error) {
         console.error('Error updating preferences:', error);
@@ -1719,721 +1838,26 @@ function createSQLiteDatabaseService() {
   };
 }
 
-function createPersistentDatabaseService() {
-  console.log('Development mode: Using persistent mock database service');
-  
-  const dataPath = path.join(os.homedir(), '.topnotch-sales-manager', 'data.json');
-  
-  // Ensure directory exists
-  const dataDir = path.dirname(dataPath);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-  
-  // Load existing data or create default
-  let persistentData = {};
-  try {
-    if (fs.existsSync(dataPath)) {
-      persistentData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-    }
-  } catch {
-    console.log('Error loading persistent data, starting fresh');
-  }
-  
-  // Initialize default data if not exists
-  if (!persistentData.settings) {
-    persistentData.settings = {
-      companyName: 'TopNotch Electronics',
-      address: '',
-      phone: '',
-      email: '',
-      taxRate: 0.15,
-      currency: 'USD',
-    };
-  }
-  
-  if (!persistentData.preferences) {
-    persistentData.preferences = {
-      onboardingCompleted: false,
-      autoSaveDrafts: true,
-      confirmBeforeDelete: true,
-      showAnimations: true,
-      lowStockAlerts: true,
-      defaultPaymentMethod: 'cash',
-      invoiceNumberFormat: 'INV-{YYYY}-{MM}-{####}',
-      receiptFooter: 'Thank you for your business!',
-      autoBackup: true,
-      backupFrequency: 'daily',
-      showProductImages: true,
-      defaultInvoiceStatus: 'completed',
-      receiptPaperSize: 'A4',
-      showTaxBreakdown: true,
-      requireCustomerInfo: false,
-      autoCalculateTax: true,
-      defaultDiscountPercent: 0,
-      showProfitMargin: false,
-      inventoryTracking: true,
-      barcodeScanning: false,
-      darkMode: false,
-      language: 'en',
-      dateFormat: 'MM/DD/YYYY',
-      timeFormat: '12h',
-      currencyPosition: 'before',
-      decimalPlaces: 2,
-      autoLogout: false,
-      sessionTimeout: 30,
-      printReceipts: true,
-      soundEffects: true
-    };
-  }
-  
-  if (!persistentData.customers) persistentData.customers = [];
-  if (!persistentData.products) persistentData.products = [];
-  if (!persistentData.sales) persistentData.sales = [];
-  if (!persistentData.invoices) persistentData.invoices = [];
-  if (!persistentData.invoiceTemplates) persistentData.invoiceTemplates = [];
-  
-  return {
-    async initialize() {
-      console.log('Persistent mock database initialized');
-      return Promise.resolve();
-    },
-    
-    close() {
-      console.log('Persistent mock database closed');
-      // Save data to file
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-        console.log('Data saved to:', dataPath);
-      } catch (error) {
-        console.error('Error saving data:', error);
-      }
-    },
-    
-    async getCompanySettings() {
-      return persistentData.settings;
-    },
-    
-    async updateCompanySettings(settings) {
-      console.log('Updating persistent settings:', settings);
-      persistentData.settings = { ...persistentData.settings, ...settings };
-      // Save immediately
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error saving settings:', error);
-      }
-      return persistentData.settings;
-    },
-    
-    async getPreferences() {
-      return persistentData.preferences;
-    },
-    
-    async updatePreferences(preferences) {
-      console.log('Updating persistent preferences:', preferences);
-      persistentData.preferences = { ...persistentData.preferences, ...preferences };
-      // Save immediately
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error saving preferences:', error);
-      }
-      return persistentData.preferences;
-    },
-    
-    async exportData() {
-      return {
-        customers: persistentData.customers || [],
-        products: persistentData.products || [],
-        sales: persistentData.sales || [],
-        settings: persistentData.settings || {
-          companyName: 'TopNotch Electronics',
-          address: '',
-          phone: '',
-          email: '',
-          taxRate: 0.15,
-          currency: 'USD',
-        },
-        exportedAt: new Date().toISOString(),
-      };
-    },
-    
-    async importData(data) {
-      console.log('Importing persistent data:', data);
-      persistentData.customers = data.customers || [];
-      persistentData.products = data.products || [];
-      persistentData.sales = data.sales || [];
-      persistentData.settings = data.settings || persistentData.settings;
-      persistentData.preferences = data.preferences || persistentData.preferences;
-      
-      // Save immediately
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error saving imported data:', error);
-      }
-      return Promise.resolve();
-    },
-    
-    // Customer management methods
-    async getCustomers() {
-      return persistentData.customers || [];
-    },
-    
-    async getCustomerById(id) {
-      const customers = persistentData.customers || [];
-      return customers.find(customer => customer.id === id) || null;
-    },
-    
-    async createCustomer(customerData) {
-      const customer = {
-        id: `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        ...customerData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      if (!persistentData.customers) {
-        persistentData.customers = [];
-      }
-      persistentData.customers.push(customer);
-      
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error saving customer:', error);
-      }
-      
-      return customer;
-    },
-    
-    async updateCustomer(id, updates) {
-      const customers = persistentData.customers || [];
-      const customerIndex = customers.findIndex(customer => customer.id === id);
-      
-      if (customerIndex === -1) {
-        throw new Error('Customer not found');
-      }
-      
-      customers[customerIndex] = {
-        ...customers[customerIndex],
-        ...updates,
-        updatedAt: new Date().toISOString()
-      };
-      
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error updating customer:', error);
-      }
-      
-      return customers[customerIndex];
-    },
-    
-    async deleteCustomer(id) {
-      const customers = persistentData.customers || [];
-      const customerIndex = customers.findIndex(customer => customer.id === id);
-      
-      if (customerIndex === -1) {
-        throw new Error('Customer not found');
-      }
-      
-      customers.splice(customerIndex, 1);
-      
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error deleting customer:', error);
-      }
-      
-      return true;
-    },
-    
-    async searchCustomers(query) {
-      const customers = persistentData.customers || [];
-      const lowercaseQuery = query.toLowerCase();
-      
-      return customers.filter(customer =>
-        customer.name.toLowerCase().includes(lowercaseQuery) ||
-        customer.email?.toLowerCase().includes(lowercaseQuery) ||
-        customer.phone?.includes(query) ||
-        customer.company?.toLowerCase().includes(lowercaseQuery)
-      );
-    },
-    
-    async getCustomerStats() {
-      const customers = persistentData.customers || [];
-      
-      return {
-        total: customers.length,
-        active: customers.filter(c => c.isActive !== false).length,
-        inactive: customers.filter(c => c.isActive === false).length,
-        withEmail: customers.filter(c => c.email && c.email.trim()).length,
-        withPhone: customers.filter(c => c.phone && c.phone.trim()).length
-      };
-    },
+// Removed createPersistentDatabaseService - using SQLite only
 
-    // Invoice management methods
-    async getInvoices() {
-      return persistentData.invoices || [];
-    },
-
-    async getInvoiceById(id) {
-      const invoices = persistentData.invoices || [];
-      return invoices.find(invoice => invoice.id === id) || null;
-    },
-
-
-    async updateInvoice(id, updates) {
-      const invoices = persistentData.invoices || [];
-      const invoiceIndex = invoices.findIndex(invoice => invoice.id === id);
-      
-      if (invoiceIndex === -1) {
-        throw new Error('Invoice not found');
-      }
-      
-      // Update the invoice with new data
-      invoices[invoiceIndex] = {
-        ...invoices[invoiceIndex],
-        ...updates,
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Recalculate balance if paidAmount is updated
-      if ('paidAmount' in updates) {
-        invoices[invoiceIndex].balance = invoices[invoiceIndex].total - updates.paidAmount;
-      }
-      
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error updating invoice:', error);
-      }
-      
-      return invoices[invoiceIndex];
-    },
-
-    async deleteInvoice(id) {
-      const invoices = persistentData.invoices || [];
-      const invoiceIndex = invoices.findIndex(invoice => invoice.id === id);
-      
-      if (invoiceIndex === -1) {
-        throw new Error('Invoice not found');
-      }
-      
-      invoices.splice(invoiceIndex, 1);
-      
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error deleting invoice:', error);
-      }
-      
-      return true;
-    },
-
-    // Invoice template methods
-    async getAllInvoiceTemplates() {
-      const templates = persistentData.invoiceTemplates || [];
-      
-      // If no templates in database, return default templates
-      if (templates.length === 0) {
-        const defaultTemplates = [
-          {
-            id: 'pro-corporate',
-            name: 'Pro Corporate',
-            description: 'Professional corporate invoice template',
-            colors: {
-              primary: '#1f2937',
-              secondary: '#6b7280',
-              accent: '#3b82f6',
-              background: '#ffffff',
-              text: '#111827'
-            },
-            layout: {
-              headerStyle: 'modern',
-              showLogo: true,
-              showBorder: true,
-              itemTableStyle: 'detailed',
-              footerStyle: 'detailed'
-            },
-            fonts: {
-              primary: 'Inter',
-              secondary: 'Inter',
-              size: 'medium'
-            },
-            isDefault: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            id: 'classic-column',
-            name: 'Classic Column',
-            description: 'Classic column-based invoice template',
-            colors: {
-              primary: '#1f2937',
-              secondary: '#6b7280',
-              accent: '#059669',
-              background: '#ffffff',
-              text: '#111827'
-            },
-            layout: {
-              headerStyle: 'classic',
-              showLogo: true,
-              showBorder: true,
-              itemTableStyle: 'simple',
-              footerStyle: 'minimal'
-            },
-            fonts: {
-              primary: 'Times New Roman',
-              secondary: 'Arial',
-              size: 'medium'
-            },
-            isDefault: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            id: 'modern-stripe',
-            name: 'Modern Stripe',
-            description: 'Modern stripe-style invoice template',
-            colors: {
-              primary: '#1f2937',
-              secondary: '#6b7280',
-              accent: '#7c3aed',
-              background: '#ffffff',
-              text: '#111827'
-            },
-            layout: {
-              headerStyle: 'minimal',
-              showLogo: true,
-              showBorder: false,
-              itemTableStyle: 'modern',
-              footerStyle: 'minimal'
-            },
-            fonts: {
-              primary: 'Inter',
-              secondary: 'Inter',
-              size: 'medium'
-            },
-            isDefault: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            id: 'elegant-dark',
-            name: 'Elegant Dark',
-            description: 'Elegant dark theme invoice template',
-            colors: {
-              primary: '#ffffff',
-              secondary: '#d1d5db',
-              accent: '#f59e0b',
-              background: '#111827',
-              text: '#f9fafb'
-            },
-            layout: {
-              headerStyle: 'premium',
-              showLogo: true,
-              showBorder: true,
-              itemTableStyle: 'modern',
-              footerStyle: 'detailed'
-            },
-            fonts: {
-              primary: 'Inter',
-              secondary: 'Inter',
-              size: 'medium'
-            },
-            isDefault: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            id: 'minimal-outline',
-            name: 'Minimal Outline',
-            description: 'Clean minimal outline template',
-            colors: {
-              primary: '#1f2937',
-              secondary: '#6b7280',
-              accent: '#dc2626',
-              background: '#ffffff',
-              text: '#111827'
-            },
-            layout: {
-              headerStyle: 'minimal',
-              showLogo: false,
-              showBorder: true,
-              itemTableStyle: 'simple',
-              footerStyle: 'minimal'
-            },
-            fonts: {
-              primary: 'Inter',
-              secondary: 'Inter',
-              size: 'small'
-            },
-            isDefault: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-        ];
-        return defaultTemplates;
-      }
-      
-      return templates;
-    },
-
-    async getInvoiceTemplateById(id) {
-      const templates = await this.getAllInvoiceTemplates();
-      return templates.find(template => template.id === id) || null;
-    },
-
-    async createInvoiceTemplate(templateData) {
-      const template = {
-        id: `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        ...templateData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      if (!persistentData.invoiceTemplates) {
-        persistentData.invoiceTemplates = [];
-      }
-      persistentData.invoiceTemplates.push(template);
-
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error saving invoice template:', error);
-      }
-
-      return template;
-    },
-
-    async updateInvoiceTemplate(id, updates) {
-      const templates = persistentData.invoiceTemplates || [];
-      const templateIndex = templates.findIndex(template => template.id === id);
-
-      if (templateIndex === -1) {
-        throw new Error('Invoice template not found');
-      }
-
-      templates[templateIndex] = {
-        ...templates[templateIndex],
-        ...updates,
-        updatedAt: new Date().toISOString()
-      };
-
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error updating invoice template:', error);
-      }
-
-      return templates[templateIndex];
-    },
-
-    async deleteInvoiceTemplate(id) {
-      const templates = persistentData.invoiceTemplates || [];
-      const templateIndex = templates.findIndex(template => template.id === id);
-
-      if (templateIndex === -1) {
-        throw new Error('Invoice template not found');
-      }
-
-      templates.splice(templateIndex, 1);
-
-      try {
-        fs.writeFileSync(dataPath, JSON.stringify(persistentData, null, 2));
-      } catch (error) {
-        console.error('Error deleting invoice template:', error);
-      }
-
-      return true;
-    }
-  };
-}
-
-function createFallbackDatabaseService() {
-  console.log('Fallback mock database service initialized');
-  
-  return {
-    async initialize() {
-      console.log('Fallback mock database initialized');
-      return Promise.resolve();
-    },
-    
-    close() {
-      console.log('Fallback mock database closed');
-    },
-    
-    async getCompanySettings() {
-      return {
-        companyName: 'TopNotch Electronics',
-        address: '',
-        phone: '',
-        email: '',
-        taxRate: 0.15,
-        currency: 'USD',
-      };
-    },
-    
-    async updateCompanySettings(settings) {
-      console.log('Mock update settings:', settings);
-      return {
-        companyName: settings.companyName || 'TopNotch Electronics',
-        address: settings.address || '',
-        phone: settings.phone || '',
-        email: settings.email || '',
-        taxRate: settings.taxRate || 0.15,
-        currency: settings.currency || 'USD',
-      };
-    },
-    
-    async getPreferences() {
-      return {
-        autoSaveDrafts: true,
-        confirmBeforeDelete: true,
-        showAnimations: true,
-        lowStockAlerts: true,
-        defaultPaymentMethod: 'cash',
-        invoiceNumberFormat: 'INV-{YYYY}-{MM}-{####}',
-        receiptFooter: 'Thank you for your business!',
-        autoBackup: true,
-        backupFrequency: 'daily',
-        showProductImages: true,
-        defaultInvoiceStatus: 'completed',
-        receiptPaperSize: 'A4',
-        showTaxBreakdown: true,
-        requireCustomerInfo: false,
-        autoCalculateTax: true,
-        defaultDiscountPercent: 0,
-        showProfitMargin: false,
-        inventoryTracking: true,
-        barcodeScanning: false,
-        darkMode: false,
-        language: 'en',
-        dateFormat: 'MM/DD/YYYY',
-        timeFormat: '12h',
-        currencyPosition: 'before',
-        decimalPlaces: 2,
-        autoLogout: false,
-        sessionTimeout: 30,
-        printReceipts: true,
-        soundEffects: true
-      };
-    },
-    
-    async updatePreferences(preferences) {
-      console.log('Mock update preferences:', preferences);
-      return preferences;
-    },
-    
-    async exportData() {
-      return {
-        customers: [],
-        products: [],
-        sales: [],
-        settings: {
-          companyName: 'TopNotch Electronics',
-          address: '',
-          phone: '',
-          email: '',
-          taxRate: 0.15,
-          currency: 'USD',
-        },
-        exportedAt: new Date().toISOString(),
-      };
-    },
-    
-    async importData(data) {
-      console.log('Mock import data:', data);
-      return Promise.resolve();
-    },
-
-    // Invoice methods for fallback
-    async getInvoices() {
-      console.log('Mock getInvoices called');
-      return [];
-    },
-
-    async getInvoiceById(id) {
-      console.log('Mock getInvoiceById called for ID:', id);
-      return null;
-    },
-
-    async createInvoice(invoiceData) {
-      console.log('Mock createInvoice called:', invoiceData);
-      return {
-        id: Math.random().toString(36).substring(2) + Date.now().toString(36),
-        ...invoiceData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    },
-
-    async updateInvoice(id, updates) {
-      console.log('Mock updateInvoice called for ID:', id, 'with updates:', updates);
-      return null;
-    },
-
-    async deleteInvoice(id) {
-      console.log('Mock deleteInvoice called for ID:', id);
-      return true;
-    },
-
-    async getAllInvoiceTemplates() {
-      console.log('Mock getAllInvoiceTemplates called');
-      return [];
-    },
-
-    async getInvoiceTemplateById(id) {
-      console.log('Mock getInvoiceTemplateById called for ID:', id);
-      return null;
-    },
-
-    async createInvoiceTemplate(templateData) {
-      console.log('Mock createInvoiceTemplate called:', templateData);
-      return {
-        id: Math.random().toString(36).substring(2) + Date.now().toString(36),
-        ...templateData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    },
-
-    async updateInvoiceTemplate(id, updates) {
-      console.log('Mock updateInvoiceTemplate called for ID:', id, 'with updates:', updates);
-      return null;
-    },
-
-    async deleteInvoiceTemplate(id) {
-      console.log('Mock deleteInvoiceTemplate called for ID:', id);
-      return true;
-    }
-  };
-}
+// Removed createFallbackDatabaseService - using SQLite only
 
 function initializeDatabaseService() {
-  console.log('Initializing database service...');
-  console.log('sqlite3 available:', !!sqlite3);
+  console.log('🔧 Initializing database service...');
+  console.log('🔧 sqlite3 available:', !!sqlite3);
 
-  try {
-    // Try to use SQLite database first (for consistency with frontend)
-    if (sqlite3) {
-      console.log('Creating SQLite database service');
-      const service = createSQLiteDatabaseService();
-      console.log('SQLite service created, type:', typeof service);
-      console.log('SQLite service keys:', Object.keys(service));
-      return service;
-    } else {
-      console.log('SQLite not available, using JSON file service');
-      return createPersistentDatabaseService();
-    }
-  } catch (error) {
-    console.log('Error initializing database service, using fallback:', error.message);
-    console.log('Error stack:', error.stack);
-    return createFallbackDatabaseService();
+  if (!sqlite3) {
+    throw new Error('better-sqlite3 is required but not available. Please ensure it is properly installed and rebuilt for Electron.');
   }
+
+  console.log('🔧 Creating SQLite database service');
+  const service = createSQLiteDatabaseService();
+  console.log('🔧 SQLite service created, type:', typeof service);
+  console.log('🔧 SQLite service keys:', Object.keys(service));
+  console.log('🔧 SQLite service has getProducts:', typeof service.getProducts);
+  console.log('🔧 SQLite service has getSales:', typeof service.getSales);
+  console.log('🔧 SQLite service has getOrders:', typeof service.getOrders);
+  return service;
 }
 
 module.exports = {

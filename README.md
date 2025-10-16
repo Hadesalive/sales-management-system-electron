@@ -36,7 +36,7 @@ npm run pack:win    # Windows
 npm run pack:linux  # Linux
 ```
 
-See [PACKAGING-GUIDE.md](./PACKAGING-GUIDE.md) for detailed packaging instructions.
+See [PACKAGING.md](./PACKAGING.md) for detailed packaging instructions.
 
 ---
 
@@ -119,7 +119,7 @@ See [PACKAGING-GUIDE.md](./PACKAGING-GUIDE.md) for detailed packaging instructio
 ## 📖 Documentation
 
 ### **Packaging Guide**
-See [`PACKAGING-GUIDE.md`](./PACKAGING-GUIDE.md) for:
+See [`PACKAGING.md`](./PACKAGING.md) for:
 - Building installers for macOS/Windows/Linux
 - Distribution guidelines
 - Update strategies

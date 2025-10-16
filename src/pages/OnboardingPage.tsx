@@ -135,18 +135,31 @@ export default function OnboardingPage() {
 
   const completeOnboarding = async () => {
     try {
+      console.log('Onboarding: Attempting to complete onboarding...');
+      
       // Save onboarding completion flag to database
       if (typeof window !== 'undefined' && window.electronAPI) {
+        console.log('Onboarding: electronAPI is available');
         const electronAPI = window.electronAPI as Record<string, unknown>;
         if ('updatePreferences' in electronAPI && typeof electronAPI.updatePreferences === 'function') {
-          await (electronAPI.updatePreferences as (prefs: { onboardingCompleted: boolean }) => Promise<unknown>)({ onboardingCompleted: true });
+          console.log('Onboarding: Calling updatePreferences...');
+          const result = await (electronAPI.updatePreferences as (prefs: { onboardingCompleted: boolean }) => Promise<unknown>)({ onboardingCompleted: true });
+          console.log('Onboarding: updatePreferences result:', result);
+        } else {
+          console.error('Onboarding: updatePreferences not found in electronAPI');
         }
+      } else {
+        console.error('Onboarding: electronAPI not available');
       }
       
+      console.log('Onboarding: Showing success message and navigating...');
       setToast({ message: 'Welcome to TopNotch Sales Manager!', type: 'success' });
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
+      
+      // Wait for database write to complete, then navigate
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('Onboarding: Navigating to dashboard...');
+      navigate('/', { replace: true }); // Use replace to prevent back navigation to onboarding
     } catch (error) {
       console.error('Error completing onboarding:', error);
       setToast({ message: 'Error saving onboarding status', type: 'error' });

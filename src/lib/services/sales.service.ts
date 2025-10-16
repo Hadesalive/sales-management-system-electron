@@ -8,9 +8,11 @@ export class SalesService extends BaseService {
 
   async getAllSales(): Promise<ApiResponse<Sale[]>> {
     try {
+      console.log('🔧 salesService.getAllSales called');
       // Use Electron IPC to get sales
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        console.log('🔧 window.electronAPI available, calling getSales');
+        const result = await window.electronAPI.getSales() as {
           success: boolean;
           data?: Sale[];
           error?: string;
@@ -33,8 +35,8 @@ export class SalesService extends BaseService {
   async getSaleById(id: string): Promise<ApiResponse<Sale | null>> {
     try {
       // Use Electron IPC to get sale by ID
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-sale-by-id', id) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getSaleById(id) as {
           success: boolean;
           data?: Sale | null;
           error?: string;
@@ -72,8 +74,8 @@ export class SalesService extends BaseService {
       }
 
       // Use Electron IPC to create sale
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('create-sale', saleData) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.createSale(saleData) as {
           success: boolean;
           data?: Sale;
           error?: string;
@@ -96,8 +98,8 @@ export class SalesService extends BaseService {
   async updateSale(id: string, updates: Partial<Sale>): Promise<ApiResponse<Sale>> {
     try {
       // Use Electron IPC to update sale
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('update-sale', { id, updates }) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.updateSale(id, updates) as {
           success: boolean;
           data?: Sale;
           error?: string;
@@ -120,8 +122,8 @@ export class SalesService extends BaseService {
   async deleteSale(id: string): Promise<ApiResponse<boolean>> {
     try {
       // Use Electron IPC to delete sale
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('delete-sale', id) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.deleteSale(id) as {
           success: boolean;
           error?: string;
         };
@@ -143,8 +145,8 @@ export class SalesService extends BaseService {
   async getSalesByStatus(status: Sale['status']): Promise<ApiResponse<Sale[]>> {
     try {
       // Use Electron IPC to get all sales and filter by status
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getSales() as {
           success: boolean;
           data?: Sale[];
           error?: string;
@@ -169,8 +171,8 @@ export class SalesService extends BaseService {
   async getRecentSales(limit: number = 10): Promise<ApiResponse<Sale[]>> {
     try {
       // Use Electron IPC to get all sales and sort by date
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getSales() as {
           success: boolean;
           data?: Sale[];
           error?: string;
@@ -198,8 +200,8 @@ export class SalesService extends BaseService {
   async getSalesPaginated(page: number = 1, limit: number = 10): Promise<ApiResponse<PaginatedResponse<Sale>>> {
     try {
       // Use Electron IPC to get all sales and paginate
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getSales() as {
           success: boolean;
           data?: Sale[];
           error?: string;
@@ -234,8 +236,8 @@ export class SalesService extends BaseService {
   async searchSales(query: string): Promise<ApiResponse<Sale[]>> {
     try {
       // Use Electron IPC to get all sales and filter
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-sales') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getSales() as {
           success: boolean;
           data?: Sale[];
           error?: string;
@@ -265,8 +267,8 @@ export class SalesService extends BaseService {
   private async validateStockAvailability(items: SaleItem[]): Promise<ApiResponse<boolean>> {
     try {
       // Use Electron IPC to get all products and validate stock
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-products') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getProducts() as {
           success: boolean;
           data?: Product[];
           error?: string;

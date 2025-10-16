@@ -11,21 +11,44 @@ const { setupEmailHandlers } = require('./email-handlers');
 const { setupPdfHandlers } = require('./pdf-handlers');
 
 function registerAllHandlers(databaseService) {
-  console.log('Registering all IPC handlers...');
+  console.log('🔧 Registering all IPC handlers...');
   
-  // Register all handler modules
-  registerSettingsHandlers(databaseService);
-  registerDataHandlers(databaseService);
-  registerCustomerHandlers(databaseService);
-  registerProductHandlers(databaseService);
-  registerSalesHandlers(databaseService);
-  registerInvoiceHandlers(databaseService);
-  registerOrderHandlers(databaseService);
-  registerReturnHandlers(databaseService);
-  setupEmailHandlers(); // Email handlers don't need database service
-  setupPdfHandlers(); // PDF generation handlers
-  
-  console.log('All IPC handlers registered successfully');
+  try {
+    // Register all handler modules
+    console.log('🔧 Registering settings handlers...');
+    registerSettingsHandlers(databaseService);
+    
+    console.log('🔧 Registering data handlers...');
+    registerDataHandlers(databaseService);
+    
+    console.log('🔧 Registering customer handlers...');
+    registerCustomerHandlers(databaseService);
+    
+    console.log('🔧 Registering product handlers...');
+    registerProductHandlers(databaseService);
+    
+    console.log('🔧 Registering sales handlers...');
+    registerSalesHandlers(databaseService);
+    
+    console.log('🔧 Registering invoice handlers...');
+    registerInvoiceHandlers(databaseService);
+    
+    console.log('🔧 Registering order handlers...');
+    registerOrderHandlers(databaseService);
+    
+    console.log('🔧 Registering return handlers...');
+    registerReturnHandlers(databaseService);
+    
+    console.log('🔧 Setting up email handlers...');
+    setupEmailHandlers(); // Email handlers don't need database service
+    
+    console.log('🔧 Setting up PDF handlers...');
+    setupPdfHandlers(); // PDF generation handlers
+    
+    console.log('✅ All IPC handlers registered successfully');
+  } catch (error) {
+    console.error('❌ Error registering IPC handlers:', error);
+  }
 }
 
 module.exports = {

@@ -156,7 +156,7 @@ export default function NewSalePage() {
         zip: "94105",
         phone: "+232 74 123-4567",
         email: "info@topnotch.com",
-        logo: "/Assets/topnotch-logo-dark.png"
+        logo: "/images/topnotch-logo-dark.png"
       },
       customer: {
         name: selectedCustomerData?.name || 'Walk-in Customer',

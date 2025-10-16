@@ -4,8 +4,8 @@ export class ReturnService {
   // Get all returns
   async getAllReturns(): Promise<ApiResponse<Return[]>> {
     try {
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-returns') as ApiResponse<Return[]>;
+      if (typeof window !== 'undefined' && window.electronAPI?.getReturns) {
+        const result = await window.electronAPI.getReturns() as ApiResponse<Return[]>;
         return {
           success: result.success,
           data: result.data || [],
@@ -26,8 +26,8 @@ export class ReturnService {
   // Get return by ID
   async getReturnById(id: string): Promise<ApiResponse<Return | null>> {
     try {
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-return-by-id', id) as ApiResponse<Return>;
+      if (typeof window !== 'undefined' && window.electronAPI?.getReturnById) {
+        const result = await window.electronAPI.getReturnById(id) as ApiResponse<Return>;
         return {
           success: result.success,
           data: result.data || null,
@@ -48,8 +48,8 @@ export class ReturnService {
   // Create new return
   async createReturn(returnData: Omit<Return, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Return>> {
     try {
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('create-return', returnData) as ApiResponse<Return>;
+      if (typeof window !== 'undefined' && window.electronAPI?.createReturn) {
+        const result = await window.electronAPI.createReturn(returnData) as ApiResponse<Return>;
         return {
           success: result.success,
           data: result.data,
@@ -69,8 +69,8 @@ export class ReturnService {
   // Update return
   async updateReturn(id: string, updates: Partial<Omit<Return, 'id' | 'createdAt' | 'updatedAt'>>): Promise<ApiResponse<Return>> {
     try {
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('update-return', { id, updates }) as ApiResponse<Return>;
+      if (typeof window !== 'undefined' && window.electronAPI?.updateReturn) {
+        const result = await window.electronAPI.updateReturn(id, updates) as ApiResponse<Return>;
         return {
           success: result.success,
           data: result.data,
@@ -90,8 +90,8 @@ export class ReturnService {
   // Delete return
   async deleteReturn(id: string): Promise<ApiResponse<void>> {
     try {
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('delete-return', id) as ApiResponse<boolean>;
+      if (typeof window !== 'undefined' && window.electronAPI?.deleteReturn) {
+        const result = await window.electronAPI.deleteReturn(id) as ApiResponse<boolean>;
         return {
           success: result.success,
           error: result.error

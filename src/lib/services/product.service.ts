@@ -9,8 +9,8 @@ export class ProductService extends BaseService {
   async getAllProducts(): Promise<ApiResponse<Product[]>> {
     try {
       // Use Electron IPC to get products
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-products') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getProducts() as {
           success: boolean;
           data?: Product[];
           error?: string;
@@ -33,8 +33,8 @@ export class ProductService extends BaseService {
   async getProductById(id: string): Promise<ApiResponse<Product | null>> {
     try {
       // Use Electron IPC to get product by ID
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-product-by-id', id) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getProductById(id) as {
           success: boolean;
           data?: Product | null;
           error?: string;
@@ -66,8 +66,8 @@ export class ProductService extends BaseService {
       }
 
       // Use Electron IPC to create product
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('create-product', productData) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.createProduct(productData) as {
           success: boolean;
           data?: Product;
           error?: string;
@@ -90,8 +90,8 @@ export class ProductService extends BaseService {
   async updateProduct(id: string, updates: Partial<Product>): Promise<ApiResponse<Product>> {
     try {
       // Use Electron IPC to update product
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('update-product', { id, updates }) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.updateProduct(id, updates) as {
           success: boolean;
           data?: Product;
           error?: string;
@@ -114,8 +114,8 @@ export class ProductService extends BaseService {
   async deleteProduct(id: string): Promise<ApiResponse<boolean>> {
     try {
       // Use Electron IPC to delete product
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('delete-product', id) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.deleteProduct(id) as {
           success: boolean;
           error?: string;
         };
@@ -137,8 +137,8 @@ export class ProductService extends BaseService {
   async getLowStockProducts(): Promise<ApiResponse<Product[]>> {
     try {
       // Use Electron IPC to get all products and filter for low stock
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-products') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getProducts() as {
           success: boolean;
           data?: Product[];
           error?: string;
@@ -170,8 +170,8 @@ export class ProductService extends BaseService {
       }
 
       // Use Electron IPC to update product stock
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('update-product', { id: productId, updates: { stock: newStock } }) as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.updateProduct(productId, { stock: newStock }) as {
           success: boolean;
           data?: Product;
           error?: string;
@@ -194,8 +194,8 @@ export class ProductService extends BaseService {
   async searchProducts(query: string): Promise<ApiResponse<Product[]>> {
     try {
       // Use Electron IPC to get all products and filter
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-products') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getProducts() as {
           success: boolean;
           data?: Product[];
           error?: string;
@@ -225,8 +225,8 @@ export class ProductService extends BaseService {
   async getProductsPaginated(page: number = 1, limit: number = 10): Promise<ApiResponse<PaginatedResponse<Product>>> {
     try {
       // Use Electron IPC to get all products and paginate
-      if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
-        const result = await window.electron.ipcRenderer.invoke('get-products') as {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const result = await window.electronAPI.getProducts() as {
           success: boolean;
           data?: Product[];
           error?: string;

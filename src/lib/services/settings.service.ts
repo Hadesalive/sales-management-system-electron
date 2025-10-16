@@ -34,12 +34,6 @@ interface Preferences {
   soundEffects: boolean;
 }
 
-interface ElectronAPIResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
 export class SettingsService extends BaseService {
   constructor() {
     super();
@@ -54,13 +48,12 @@ export class SettingsService extends BaseService {
       
       // Call the Electron main process to get settings from database
       if (typeof window !== 'undefined' && window.electronAPI) {
-        const electronAPI = window.electronAPI as Record<string, unknown>;
-        console.log('Available methods:', Object.keys(electronAPI));
+        console.log('Available methods:', Object.keys(window.electronAPI));
         
         // Try the new method first
-        if ('getCompanySettings' in electronAPI && typeof electronAPI.getCompanySettings === 'function') {
+        if (window.electronAPI.getCompanySettings) {
           console.log('Using getCompanySettings method');
-          const result = await (electronAPI.getCompanySettings as () => Promise<ElectronAPIResponse<CompanySettings>>)();
+          const result = await window.electronAPI.getCompanySettings();
           if (result.success && result.data) {
             return this.createSuccessResponse(result.data);
           } else {
@@ -69,9 +62,9 @@ export class SettingsService extends BaseService {
         }
         
         // Fallback to loadData method (legacy)
-        if ('loadData' in electronAPI && typeof electronAPI.loadData === 'function') {
+        if (window.electronAPI.loadData) {
           console.log('Using loadData fallback method');
-          const result = await (electronAPI.loadData as () => Promise<ElectronAPIResponse<{ settings?: CompanySettings }>>)();
+          const result = await window.electronAPI.loadData() as { success: boolean; data?: { settings?: CompanySettings }; error?: string };
           if (result.success && result.data?.settings) {
             return this.createSuccessResponse(result.data.settings);
           }
@@ -104,13 +97,12 @@ export class SettingsService extends BaseService {
       
       // Call the Electron main process to update settings in database
       if (typeof window !== 'undefined' && window.electronAPI) {
-        const electronAPI = window.electronAPI as Record<string, unknown>;
-        console.log('Available methods:', Object.keys(electronAPI));
+        console.log('Available methods:', Object.keys(window.electronAPI));
         
         // Try the new method first
-        if ('updateCompanySettings' in electronAPI && typeof electronAPI.updateCompanySettings === 'function') {
+        if (window.electronAPI.updateCompanySettings) {
           console.log('Using updateCompanySettings method');
-          const result = await (electronAPI.updateCompanySettings as (settings: Partial<CompanySettings>) => Promise<ElectronAPIResponse<CompanySettings>>)(settings);
+          const result = await window.electronAPI.updateCompanySettings(settings);
           if (result.success && result.data) {
             return this.createSuccessResponse(result.data);
           } else {
@@ -119,16 +111,16 @@ export class SettingsService extends BaseService {
         }
         
         // Fallback to saveData method (legacy)
-        if ('saveData' in electronAPI && typeof electronAPI.saveData === 'function') {
+        if (window.electronAPI.saveData && window.electronAPI.loadData) {
           console.log('Using saveData fallback method');
           // Load current data first
-          const loadResult = await (electronAPI.loadData as () => Promise<ElectronAPIResponse<{ settings?: CompanySettings }>>)();
+          const loadResult = await window.electronAPI.loadData() as { success: boolean; data?: { settings?: CompanySettings }; error?: string };
           if (loadResult.success && loadResult.data) {
             const updatedData = {
               ...loadResult.data,
               settings: { ...loadResult.data.settings, ...settings }
             };
-            const saveResult = await (electronAPI.saveData as (data: unknown) => Promise<ElectronAPIResponse<unknown>>)(updatedData);
+            const saveResult = await window.electronAPI.saveData(updatedData);
             if (saveResult.success) {
               // Return the updated settings
               return this.createSuccessResponse({ ...loadResult.data.settings, ...settings } as CompanySettings);
@@ -177,11 +169,10 @@ export class SettingsService extends BaseService {
       console.log('getPreferences called');
       
       if (typeof window !== 'undefined' && window.electronAPI) {
-        const electronAPI = window.electronAPI as Record<string, unknown>;
         
-        if ('getPreferences' in electronAPI && typeof electronAPI.getPreferences === 'function') {
+        if (window.electronAPI.getPreferences) {
           console.log('Using getPreferences method');
-          const result = await (electronAPI.getPreferences as () => Promise<ElectronAPIResponse<Preferences>>)();
+          const result = await window.electronAPI.getPreferences();
           if (result.success && result.data) {
             return this.createSuccessResponse(result.data);
           } else {
@@ -235,11 +226,10 @@ export class SettingsService extends BaseService {
       console.log('updatePreferences called with:', preferences);
       
       if (typeof window !== 'undefined' && window.electronAPI) {
-        const electronAPI = window.electronAPI as Record<string, unknown>;
         
-        if ('updatePreferences' in electronAPI && typeof electronAPI.updatePreferences === 'function') {
+        if (window.electronAPI.updatePreferences) {
           console.log('Using updatePreferences method');
-          const result = await (electronAPI.updatePreferences as (preferences: Partial<Preferences>) => Promise<ElectronAPIResponse<Preferences>>)(preferences);
+          const result = await window.electronAPI.updatePreferences(preferences);
           if (result.success && result.data) {
             return this.createSuccessResponse(result.data);
           } else {

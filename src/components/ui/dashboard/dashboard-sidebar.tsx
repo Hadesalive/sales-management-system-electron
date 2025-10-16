@@ -138,7 +138,7 @@ export function DashboardSidebar({
       <div className="h-12 flex items-center mb-2 px-1">
         <img
           key={theme === 'dark' ? "dark" : "light"}
-          src={theme === 'dark' ? "/Assets/topnotch-logo-light.png" : "/Assets/topnotch-logo-dark.png"}
+          src={theme === 'dark' ? "/images/topnotch-logo-light.png" : "/images/topnotch-logo-dark.png"}
           alt="TopNotch Electronics"
           className="h-16 sm:h-20 md:h-24 lg:h-28 xl:h-32 w-auto object-contain"
         />

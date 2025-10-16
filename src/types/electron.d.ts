@@ -57,6 +57,64 @@ export interface ElectronAPI {
   searchCustomers: (query: string) => Promise<{ success: boolean; data?: Customer[]; error?: string }>;
   getCustomerStats: () => Promise<{ success: boolean; data?: { total: number; active: number; inactive: number; withEmail: number; withPhone: number }; error?: string }>;
   
+  // Product operations
+  getProducts: () => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
+  getProductById: (id: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  createProduct: (productData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  updateProduct: (id: string, productData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  deleteProduct: (id: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // Sales operations
+  getSales: () => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
+  getSaleById: (id: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  createSale: (saleData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  updateSale: (id: string, saleData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  deleteSale: (id: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // Sales utility operations
+  generateInvoice: (saleId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  printReceipt: (saleId: string) => Promise<{ success: boolean; error?: string }>;
+  applyCustomerCreditToSale: (payload: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  
+  // Invoice operations
+  getInvoices: () => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
+  getInvoiceById: (id: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  createInvoice: (invoiceData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  updateInvoice: (id: string, invoiceData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  deleteInvoice: (id: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // Invoice template operations
+  getInvoiceTemplates: () => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
+  getInvoiceTemplate: (id: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  createInvoiceTemplate: (templateData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  updateInvoiceTemplate: (id: string, templateData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  deleteInvoiceTemplate: (id: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // Invoice payment operations
+  handleInvoiceOverpayment: (payload: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  applyCustomerCredit: (payload: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  
+  // Order operations
+  getOrders: () => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
+  getOrderById: (id: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  createOrder: (orderData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  updateOrder: (id: string, orderData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  deleteOrder: (id: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // Return operations
+  getReturns: () => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
+  getReturnById: (id: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  createReturn: (returnData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  updateReturn: (id: string, returnData: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  deleteReturn: (id: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // Email operations
+  emailInvoice: (emailData: unknown) => Promise<{ success: boolean; error?: string }>;
+  cleanupTempInvoices: () => Promise<{ success: boolean; error?: string }>;
+  
+  // PDF operations
+  generateInvoicePdfFromHtml: (htmlContent: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  
   // Menu events
   onMenuNewSale: (callback: (event: unknown) => void) => void;
   onMenuNewCustomer: (callback: (event: unknown) => void) => void;
@@ -79,3 +137,5 @@ declare global {
     };
   }
 }
+
+export {};
