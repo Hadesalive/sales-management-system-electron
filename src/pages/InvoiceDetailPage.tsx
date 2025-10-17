@@ -657,28 +657,36 @@ export default function InvoiceDetailsPage() {
           throw new Error('No PDF data received from Electron');
         }
 
-        // Convert base64 to blob
-        const byteCharacters = atob(pdfBase64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const pdfBlob = new Blob([byteArray], { type: 'application/pdf' });
+        // Use Electron's native file dialog for better Windows compatibility
+        if (window.electronAPI && window.electronAPI.downloadPdfFile) {
+          const result = await window.electronAPI.downloadPdfFile(pdfBase64, `Invoice-${invoice.number}.pdf`);
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to save PDF file');
+          }
+        } else {
+          // Fallback to browser download method
+          const byteCharacters = atob(pdfBase64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const pdfBlob = new Blob([byteArray], { type: 'application/pdf' });
 
-        // Create download link
-        const url = window.URL.createObjectURL(pdfBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Invoice-${invoice.number}.pdf`;
-        
-        // Trigger download
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Clean up
-        window.URL.revokeObjectURL(url);
+          // Create download link
+          const url = window.URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `Invoice-${invoice.number}.pdf`;
+          
+          // Trigger download
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          // Clean up
+          window.URL.revokeObjectURL(url);
+        }
       }
 
       setToast({ message: 'Invoice downloaded successfully!', type: 'success' });

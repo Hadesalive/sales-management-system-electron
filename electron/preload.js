@@ -96,6 +96,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // PDF operations
   generateInvoicePdfFromHtml: (htmlContent) => ipcRenderer.invoke('generate-invoice-pdf-from-html', htmlContent),
+  downloadPdfFile: (pdfBase64, filename) => ipcRenderer.invoke('download-pdf-file', { pdfBase64, filename }),
   
   // Menu events
   onMenuNewSale: (callback) => ipcRenderer.on('menu-new-sale', callback),

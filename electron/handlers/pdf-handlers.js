@@ -137,6 +137,41 @@ function setupPdfHandlers() {
     }
   });
   
+  // Handle PDF download using Electron's native file dialog
+  ipcMain.handle('download-pdf-file', async (event, { pdfBase64, filename }) => {
+    try {
+      const { dialog } = require('electron');
+      const fs = require('fs');
+      
+      console.log('Opening save dialog for PDF download...');
+      
+      // Show save dialog
+      const result = await dialog.showSaveDialog({
+        title: 'Save PDF Invoice',
+        defaultPath: filename,
+        filters: [
+          { name: 'PDF Files', extensions: ['pdf'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+      
+      if (result.canceled) {
+        return { success: false, error: 'User cancelled save dialog' };
+      }
+      
+      // Convert base64 to buffer and save
+      const buffer = Buffer.from(pdfBase64, 'base64');
+      fs.writeFileSync(result.filePath, buffer);
+      
+      console.log('PDF saved successfully to:', result.filePath);
+      return { success: true, filePath: result.filePath };
+      
+    } catch (error) {
+      console.error('Error saving PDF:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   console.log('PDF handlers registered successfully');
 }
 

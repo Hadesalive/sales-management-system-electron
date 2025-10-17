@@ -114,6 +114,7 @@ export interface ElectronAPI {
   
   // PDF operations
   generateInvoicePdfFromHtml: (htmlContent: unknown) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  downloadPdfFile: (pdfBase64: string, filename: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
   
   // Menu events
   onMenuNewSale: (callback: (event: unknown) => void) => void;
