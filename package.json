@@ -114,7 +114,8 @@
         }
       ],
       "icon": "public/icon.ico",
-      "artifactName": "${productName}-${version}-Setup.${ext}"
+      "artifactName": "${productName}-${version}-Setup.${ext}",
+      "forceCodeSigning": false
     },
     "nsis": {
       "oneClick": false,
