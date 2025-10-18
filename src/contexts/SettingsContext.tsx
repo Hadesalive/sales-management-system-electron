@@ -149,7 +149,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   // Load settings on mount
   useEffect(() => {
-    refreshSettings();
+    // Add a small delay to ensure Electron IPC is ready
+    const timer = setTimeout(() => {
+      refreshSettings();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   // Currency formatting function

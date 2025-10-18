@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import NextImage from "next/image";
+// import NextImage from "next/image"; // Removed - using regular img tag instead
 import { cn } from "@/lib/utils";
 import { Button } from "../core/button";
 import { PrinterIcon, ArrowDownTrayIcon, ShareIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
@@ -148,7 +148,7 @@ export function InvoicePreview({
           <div className="flex-1">
             <div className="flex items-center gap-4 mb-6">
               {data.company.logo ? (
-                <NextImage
+                <img
                   src={data.company.logo}
                   alt="Company Logo"
                   width={64}

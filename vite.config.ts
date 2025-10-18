@@ -18,4 +18,10 @@ export default defineConfig({
   },
   base: './', // Important for Electron
   publicDir: 'public', // Explicitly set public directory
+  define: {
+    // Define process for compatibility with Next.js dependencies
+    'process.env': {},
+    'process.platform': JSON.stringify('win32'),
+    'process.version': JSON.stringify('v18.0.0'),
+  },
 })

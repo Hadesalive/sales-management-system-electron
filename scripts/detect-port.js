@@ -12,8 +12,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-// Common Next.js dev server ports
-const possiblePorts = [3000, 3001, 3002, 3003, 3004, 3005];
+// Common dev server ports (Vite default is 5173, Next.js is 3000)
+const possiblePorts = [5173, 3000, 3001, 3002, 3003, 3004, 3005];
 
 async function checkPort(port) {
   return new Promise((resolve) => {
@@ -33,7 +33,7 @@ async function checkPort(port) {
 }
 
 async function detectDevServerPort() {
-  console.log('🔍 Detecting Next.js dev server port...');
+  console.log('🔍 Detecting dev server port...');
 
   // Check all possible ports
   for (const port of possiblePorts) {
@@ -44,9 +44,9 @@ async function detectDevServerPort() {
     }
   }
 
-  // If no port found, default to 3000
-  console.log('⚠️ No dev server found, defaulting to port 3000');
-  return 3000;
+  // If no port found, default to 5173 (Vite's default)
+  console.log('⚠️ No dev server found, defaulting to port 5173');
+  return 5173;
 }
 
 async function main() {

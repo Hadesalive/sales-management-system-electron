@@ -16,7 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { DndContext, useDraggable, useDroppable, DragEndEvent } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import Image from 'next/image';
+// import Image from 'next/image'; // Removed - using regular img tag instead
 
 // Import preview components
 import {
@@ -1013,7 +1013,7 @@ function CanvasContent({ schema, data, template, selectedNodeId, setSelectedNode
           return (node.props?.content as string) || 'Text Component';
         case 'logo':
           return template.layout.showLogo && data.company.logo ? (
-            <Image src={data.company.logo} alt="Logo" width={150} height={48} unoptimized />
+            <img src={data.company.logo} alt="Logo" width={150} height={48} />
           ) : <div className="p-2 bg-gray-200 text-xs">Logo</div>;
         case 'company':
           return (

@@ -1,6 +1,6 @@
 import React from "react";
 import { useState, useEffect } from "react";
-import NextImage from "next/image";
+// import NextImage from "next/image"; // Removed - using regular img tag instead
 import { cn } from "@/lib/utils";
 import { Button } from "../core/button";
 import { Input } from "../forms/input";
@@ -390,7 +390,7 @@ export function InvoiceBuilder({
                     <div className="flex items-center gap-4">
                       {invoiceData.company.logo ? (
                         <div className="relative">
-                          <NextImage
+                          <img
                             src={invoiceData.company.logo}
                             alt="Company Logo"
                             width={80}

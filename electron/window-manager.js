@@ -24,8 +24,8 @@ function getDevServerPort() {
     return parseInt(process.env.DEV_PORT);
   }
 
-  // Final fallback to default port
-  return 3000;
+  // Final fallback to default port (Vite's default)
+  return 5173;
 }
 
 function createMainWindow() {
@@ -52,6 +52,20 @@ function createMainWindow() {
     // In development, detect the actual port the dev server is running on
     const devPort = getDevServerPort();
     console.log(`🔗 Loading dev server on port ${devPort}`);
+    
+    // Add debugging for page load events
+    mainWindow.webContents.on('did-finish-load', () => {
+      console.log('✅ Page finished loading');
+    });
+    
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+      console.error('❌ Page failed to load:', errorCode, errorDescription);
+    });
+    
+    mainWindow.webContents.on('console-message', (event, level, message) => {
+      console.log(`🌐 Browser console [${level}]:`, message);
+    });
+    
     mainWindow.loadURL(`http://localhost:${devPort}`);
     mainWindow.webContents.openDevTools();
   } else {

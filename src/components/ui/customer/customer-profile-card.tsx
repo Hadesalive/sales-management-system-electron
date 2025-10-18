@@ -13,7 +13,7 @@ import {
   EllipsisVerticalIcon
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
-import Image from "next/image";
+// import Image from "next/image"; // Removed - using regular img tag instead
 
 interface CustomerProfileCardProps {
   customer: {
@@ -77,7 +77,7 @@ export function CustomerProfileCard({
           {/* Avatar */}
           <div className="relative">
             {customer.avatar ? (
-              <Image
+              <img
                 src={customer.avatar}
                 alt={customer.name}
                 width={64}
@@ -325,7 +325,7 @@ export function CustomerProfileCompact({
       {/* Avatar */}
       <div className="relative">
         {customer.avatar ? (
-          <Image
+          <img
             src={customer.avatar}
             alt={customer.name}
             width={40}
