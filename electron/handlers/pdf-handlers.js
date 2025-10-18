@@ -36,50 +36,22 @@ async function getBrowser() {
         '--disable-features=VizDisplayCompositor'
       ]
     });
-    console.log('Puppeteer browser launched successfully');
   }
   return browser;
 }
 
 function setupPdfHandlers() {
-  console.log('Registering PDF handlers...');
-
   // Generate PDF from HTML content sent from renderer
   ipcMain.handle('generate-invoice-pdf-from-html', async (event, { htmlContent }) => {
     try {
-      console.log('Generating PDF from HTML...');
-      
       // Convert HTML to PDF using Puppeteer
       const browserInstance = await getBrowser();
       const page = await browserInstance.newPage();
-      
-      console.log('Setting page content...');
-      console.log('HTML length:', htmlContent.length);
       
       await page.setContent(htmlContent, {
         waitUntil: 'networkidle0',
         timeout: 30000
       });
-      
-      // Debug: Check if elements exist and have styles
-      const elementInfo = await page.evaluate(() => {
-        const elements = document.querySelectorAll('.print-invoice');
-        return {
-          count: elements.length,
-          elements: Array.from(elements).map((el, index) => ({
-            index,
-            hasBorder: window.getComputedStyle(el).border !== 'none',
-            borderWidth: window.getComputedStyle(el).borderWidth,
-            borderColor: window.getComputedStyle(el).borderColor,
-            borderStyle: window.getComputedStyle(el).borderStyle,
-            borderRadius: window.getComputedStyle(el).borderRadius,
-            boxShadow: window.getComputedStyle(el).boxShadow,
-            inlineStyle: el.getAttribute('style')
-          }))
-        };
-      });
-      
-      console.log('Element debug info:', JSON.stringify(elementInfo, null, 2));
       
       // Wait for Tailwind and rendering
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -91,13 +63,10 @@ function setupPdfHandlers() {
             await document.fonts.ready;
           }
         });
-      } catch (error) {
-        console.log('Font wait skipped (frame detached):', error.message);
+      } catch {
+        // Font wait skipped (frame detached)
       }
       
-      // No custom styling - render exactly as captured from preview
-
-      console.log('Generating PDF...');
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
@@ -113,16 +82,11 @@ function setupPdfHandlers() {
       
       await page.close();
       
-      console.log('PDF generated successfully, size:', pdfBuffer.length, 'bytes');
-      
       // Convert to Buffer if it's a Uint8Array
       const buffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer);
       
       // Return PDF as base64 for IPC transfer
-      const base64String = buffer.toString('base64');
-      console.log('Base64 string length:', base64String.length);
-      
-      return base64String;
+      return buffer.toString('base64');
       
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -143,8 +107,6 @@ function setupPdfHandlers() {
       const { dialog } = require('electron');
       const fs = require('fs');
       
-      console.log('Opening save dialog for PDF download...');
-      
       // Show save dialog
       const result = await dialog.showSaveDialog({
         title: 'Save PDF Invoice',
@@ -163,7 +125,6 @@ function setupPdfHandlers() {
       const buffer = Buffer.from(pdfBase64, 'base64');
       fs.writeFileSync(result.filePath, buffer);
       
-      console.log('PDF saved successfully to:', result.filePath);
       return { success: true, filePath: result.filePath };
       
     } catch (error) {
@@ -171,8 +132,6 @@ function setupPdfHandlers() {
       return { success: false, error: error.message };
     }
   });
-
-  console.log('PDF handlers registered successfully');
 }
 
 module.exports = {

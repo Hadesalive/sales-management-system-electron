@@ -2,40 +2,22 @@
 const { ipcMain } = require('electron');
 
 function registerProductHandlers(databaseService) {
-  console.log('🔧 registerProductHandlers called with databaseService:', !!databaseService);
-  
-  // Check what methods are available on databaseService
-  if (databaseService) {
-    console.log('🔧 databaseService methods:', Object.getOwnPropertyNames(databaseService));
-    console.log('🔧 databaseService.getProducts exists:', typeof databaseService.getProducts);
-  } else {
-    console.error('❌ databaseService is null/undefined in product handlers');
-  }
-  
   // Product-related IPC handlers
   ipcMain.handle('get-products', async () => {
     try {
-      console.log('🔧 get-products IPC handler called');
-      
       // Safety check: ensure databaseService is available and has getProducts method
       if (!databaseService) {
-        console.error('❌ databaseService is null in get-products handler');
         return { success: false, error: 'Database service not available' };
       }
       
       if (typeof databaseService.getProducts !== 'function') {
-        console.error('❌ databaseService.getProducts is not a function');
-        console.log('Available methods:', Object.getOwnPropertyNames(databaseService));
         return { success: false, error: 'getProducts method not available on database service' };
       }
       
-      console.log('🔧 Calling databaseService.getProducts()');
       const products = await databaseService.getProducts();
-      console.log('🔧 get-products result:', products?.length || 0, 'products');
-      
       return { success: true, data: products || [] };
     } catch (error) {
-      console.error('🔧 get-products error:', error);
+      console.error('get-products error:', error);
       return { success: false, error: error.message };
     }
   });

@@ -8,50 +8,29 @@ const { createTables, migrateDatabase, initializeDefaultData } = require('../sch
 let sqlite3 = null;
 try {
   sqlite3 = require('better-sqlite3');
-  console.log('✅ better-sqlite3 loaded successfully');
-  console.log('better-sqlite3 version:', sqlite3.VERSION);
-  console.log('better-sqlite3 path:', require.resolve('better-sqlite3'));
 } catch (error) {
-  console.log('❌ better-sqlite3 not available:', error.message);
-  console.log('Error details:', error);
-  console.log('Falling back to JSON file storage');
+  console.error('better-sqlite3 not available:', error.message);
 }
 
 function createSQLiteDatabaseService() {
-  console.log('🔧 Creating SQLite database service');
-  console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
-  console.log('🔧 sqlite3 available:', !!sqlite3);
-  console.log('🔧 sqlite3 type:', typeof sqlite3);
-
   // Determine database path based on environment
   let dbPath;
-  console.log('🔧 NODE_ENV check:', process.env.NODE_ENV);
-  console.log('🔧 NODE_ENV === "production":', process.env.NODE_ENV === 'production');
   
   if (process.env.NODE_ENV === 'production') {
     // Production: use user data directory
-    console.log('🔧 Production mode: Database in user data directory');
-    
     // Try different database paths as fallbacks
     const possiblePaths = [];
     
     // Try to get user data path from Electron app if available
     try {
       const { app } = require('electron');
-      console.log('🔧 App is ready:', app.isReady());
-      console.log('🔧 App name:', app.getName());
-      console.log('🔧 App version:', app.getVersion());
-      
       if (app.isReady()) {
         const userDataPath = app.getPath('userData');
-        console.log('🔧 User data path:', userDataPath);
         possiblePaths.push(path.join(userDataPath, 'topnotch-sales.db'));
         possiblePaths.push(path.join(userDataPath, 'database.db'));
-      } else {
-        console.log('⚠️ App not ready, using fallback paths');
       }
-    } catch (error) {
-      console.log('⚠️ Could not access Electron app:', error.message);
+    } catch {
+      // Continue with fallback paths
     }
     
     // Add fallback paths in user's home directory (these should always work)
@@ -59,17 +38,12 @@ function createSQLiteDatabaseService() {
     possiblePaths.push(path.join(os.homedir(), 'TopNotch Sales Manager', 'topnotch-sales.db'));
     possiblePaths.push(path.join(os.homedir(), '.topnotch-sales-manager', 'topnotch-sales.db'));
     
-    console.log('🔧 Possible database paths:', possiblePaths);
-    
     let workingPath = null;
     for (const testPath of possiblePaths) {
       try {
-        console.log('🔧 Testing database path:', testPath);
-        
         // Ensure directory exists
         const dir = path.dirname(testPath);
         if (!fs.existsSync(dir)) {
-          console.log('🔧 Creating directory:', dir);
           fs.mkdirSync(dir, { recursive: true });
         }
         
@@ -79,10 +53,8 @@ function createSQLiteDatabaseService() {
         fs.unlinkSync(testFile);
         
         workingPath = testPath;
-        console.log('✅ Found working database path:', workingPath);
         break;
-      } catch (error) {
-        console.log('❌ Path not writable:', testPath, error.message);
+      } catch {
         continue;
       }
     }
@@ -92,43 +64,23 @@ function createSQLiteDatabaseService() {
     }
     
     dbPath = workingPath;
-    console.log('🔧 Final database path:', dbPath);
   } else {
     // Development: use project root
-    console.log('🔧 Development mode: Database in project root');
-    console.log('🔧 Current working directory:', process.cwd());
     dbPath = path.join(process.cwd(), 'topnotch-sales.db');
-    console.log('🔧 Database path:', dbPath);
   }
   
-  console.log('🔧 Final dbPath before SQLite:', dbPath);
-
   if (!sqlite3) {
-    console.log('❌ better-sqlite3 not available, throwing error');
     throw new Error('better-sqlite3 not available');
   }
 
-  console.log('🔧 Opening SQLite database...');
   let db;
   try {
-    // Try to open the database with better error handling
-    db = sqlite3(dbPath, { 
-      verbose: console.log // Enable verbose logging for debugging
-    });
-    console.log('✅ SQLite database opened successfully');
-    
+    // Try to open the database
+    db = sqlite3(dbPath);
+
     // Test if the database is actually working
     db.prepare('SELECT 1').get();
-    console.log('✅ SQLite database is functional');
   } catch (error) {
-    console.error('❌ Failed to open SQLite database:', error);
-    console.error('❌ Database path:', dbPath);
-    console.error('❌ Error details:', {
-      message: error.message,
-      code: error.code,
-      errno: error.errno
-    });
-    
     // Provide more specific error messages
     if (error.code === 'SQLITE_CANTOPEN') {
       throw new Error(`Cannot open database file at ${dbPath}. This is usually a permissions issue or the directory doesn't exist.`);
@@ -142,22 +94,17 @@ function createSQLiteDatabaseService() {
   return {
     async initialize() {
       try {
-        console.log('Creating database tables from development schema...');
         createTables(db);
-        console.log('Running database migrations...');
         migrateDatabase(db);
-        console.log('Initializing default data...');
         initializeDefaultData(db);
-        console.log('✅ Database initialization complete');
         return Promise.resolve();
       } catch (error) {
-        console.error('❌ Database initialization failed:', error);
+        console.error('Database initialization failed:', error);
         throw error;
       }
     },
 
     close() {
-      console.log('Closing SQLite database');
       db.close();
     },
 
@@ -1822,21 +1769,11 @@ function createSQLiteDatabaseService() {
 // Removed createFallbackDatabaseService - using SQLite only
 
 function initializeDatabaseService() {
-  console.log('🔧 Initializing database service...');
-  console.log('🔧 sqlite3 available:', !!sqlite3);
-
   if (!sqlite3) {
     throw new Error('better-sqlite3 is required but not available. Please ensure it is properly installed and rebuilt for Electron.');
   }
 
-  console.log('🔧 Creating SQLite database service');
-  const service = createSQLiteDatabaseService();
-  console.log('🔧 SQLite service created, type:', typeof service);
-  console.log('🔧 SQLite service keys:', Object.keys(service));
-  console.log('🔧 SQLite service has getProducts:', typeof service.getProducts);
-  console.log('🔧 SQLite service has getSales:', typeof service.getSales);
-  console.log('🔧 SQLite service has getOrders:', typeof service.getOrders);
-  return service;
+  return createSQLiteDatabaseService();
 }
 
 module.exports = {

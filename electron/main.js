@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-console.log('🚨🚨🚨 MAIN PROCESS STARTING - THIS SHOULD APPEAR IN CONSOLE 🚨🚨🚨');
 
 // Set NODE_ENV to production if not already set (for packaged apps)
 if (!process.env.NODE_ENV) {
@@ -15,38 +14,24 @@ const { registerAllHandlers } = require('./handlers');
 const { createMainWindow } = require('./window-manager');
 const { createApplicationMenu } = require('./menu-manager');
 
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('isDev:', isDev);
-
 // Global references
 let mainWindow;
 let databaseService;
 
 async function initializeApp() {
   try {
-    console.log('🔧 Environment:', process.env.NODE_ENV);
-    console.log('🔧 App path:', app.getAppPath());
-    console.log('🔧 User data path:', app.getPath('userData'));
-    console.log('🔧 App is ready:', app.isReady());
-    
     // Initialize database service AFTER app is ready
-    console.log('🔧 Creating database service...');
     databaseService = initializeDatabaseService();
     
     // Initialize database and WAIT for it to complete
-    console.log('🔧 Initializing database...');
     await databaseService.initialize();
-    console.log('✅ Database initialized successfully');
 
     // Register all IPC handlers AFTER database is ready
-    console.log('🔧 About to register all handlers...');
     registerAllHandlers(databaseService);
-    console.log('🔧 Handler registration completed');
     
     return true;
   } catch (error) {
-    console.error('❌ Failed to initialize app:', error);
-    console.error('❌ Error stack:', error.stack);
+    console.error('Failed to initialize app:', error);
     
     // Show error dialog to user
     const { dialog } = require('electron');
@@ -74,7 +59,7 @@ async function setupApp() {
       mainWindow = null;
     });
   } catch (error) {
-    console.error('❌ Failed to setup app:', error);
+    console.error('Failed to setup app:', error);
     throw error;
   }
 }
