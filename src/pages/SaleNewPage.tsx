@@ -19,14 +19,17 @@ import {
 
 export default function NewSalePage() {
   const navigate = useNavigate();
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, preferences, companySettings } = useSettings();
   
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'bank_transfer' | 'other'>('cash');
+  const [discount, setDiscount] = useState(preferences.defaultDiscountPercent || 0);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'bank_transfer' | 'other'>(
+    (preferences.defaultPaymentMethod as 'cash' | 'card' | 'bank_transfer' | 'other') || 'cash'
+  );
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
@@ -127,10 +130,17 @@ export default function NewSalePage() {
   const calculateTotals = () => {
     const currentSaleItems = saleItems || [];
     const subtotal = currentSaleItems.reduce((sum, item) => sum + item.total, 0);
-    const tax = subtotal * 0.15; // 15% tax rate
-    const total = subtotal + tax;
     
-    return { subtotal, tax, total };
+    // Apply discount if set
+    const discountAmount = (subtotal * discount) / 100;
+    const discountedSubtotal = subtotal - discountAmount;
+    
+    // Calculate tax on discounted amount
+    const taxRate = companySettings.taxRate || 0.15;
+    const tax = discountedSubtotal * taxRate;
+    const total = discountedSubtotal + tax;
+    
+    return { subtotal, discount: discountAmount, tax, total };
   };
 
   // Prepare receipt data
@@ -149,13 +159,13 @@ export default function NewSalePage() {
         minute: '2-digit' 
       }),
       company: {
-        name: "TopNotch Electronics",
-        address: "Pultney Street",
+        name: companySettings.companyName || "TopNotch Electronics",
+        address: companySettings.address || "Pultney Street",
         city: "Freetown",
         state: "Western Area Urban, BO etc",
         zip: "94105",
-        phone: "+232 74 123-4567",
-        email: "info@topnotch.com",
+        phone: companySettings.phone || "+232 74 123-4567",
+        email: companySettings.email || "info@topnotch.com",
         logo: "/images/topnotch-logo-dark.png"
       },
       customer: {
@@ -171,8 +181,9 @@ export default function NewSalePage() {
         amount: item.total
       })),
       paymentMethod: paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1).replace('_', ' '),
-      taxRate: 15,
-      discount: 0
+      taxRate: Math.round((companySettings.taxRate || 0.15) * 100),
+      discount: discount,
+      footerMessage: preferences.receiptFooter || 'Thank you for your business!'
     };
   };
 
@@ -311,7 +322,7 @@ export default function NewSalePage() {
     setLoading(true);
     
     try {
-      const { subtotal, tax, total } = calculateTotals();
+      const { subtotal, discount: discountAmount, tax, total } = calculateTotals();
       const selectedCustomerData = customers.find(c => c.id === selectedCustomer);
       
       const saleData = {
@@ -320,7 +331,7 @@ export default function NewSalePage() {
         items: saleItems,
         subtotal,
         tax,
-        discount: 0,
+        discount: discountAmount,
         total,
         status: 'completed' as const,
         paymentMethod,
@@ -352,7 +363,7 @@ export default function NewSalePage() {
     }
   };
 
-  const { subtotal, tax, total } = calculateTotals();
+  const { subtotal, discount: discountAmount, tax, total } = calculateTotals();
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -594,16 +605,30 @@ export default function NewSalePage() {
                   </h2>
                 </div>
                 
-                <Select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as 'cash' | 'card' | 'bank_transfer' | 'other')}
-                  options={[
-                    { value: 'cash', label: 'Cash' },
-                    { value: 'card', label: 'Card' },
-                    { value: 'bank_transfer', label: 'Bank Transfer' },
-                    { value: 'other', label: 'Other' }
-                  ]}
-                />
+                <div className="space-y-4">
+                  <Select
+                    label="Payment Method"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'cash' | 'card' | 'bank_transfer' | 'other')}
+                    options={[
+                      { value: 'cash', label: 'Cash' },
+                      { value: 'card', label: 'Card' },
+                      { value: 'bank_transfer', label: 'Bank Transfer' },
+                      { value: 'other', label: 'Other' }
+                    ]}
+                  />
+                  
+                  <Input
+                    label="Discount (%)"
+                    type="number"
+                    value={discount}
+                    onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="0"
+                  />
+                </div>
               </div>
 
               {/* Totals */}
@@ -629,8 +654,17 @@ export default function NewSalePage() {
                     </span>
                   </div>
                   
+                  {discount > 0 && (
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--muted-foreground)' }}>Discount ({discount}%):</span>
+                      <span className="font-semibold text-red-600">
+                        -{formatCurrency(discountAmount)}
+                      </span>
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between">
-                    <span style={{ color: 'var(--muted-foreground)' }}>Tax (15%):</span>
+                    <span style={{ color: 'var(--muted-foreground)' }}>Tax ({Math.round((companySettings.taxRate || 0.15) * 100)}%):</span>
                     <span className="font-semibold" style={{ color: 'var(--foreground)' }}>
                       {formatCurrency(tax)}
                     </span>

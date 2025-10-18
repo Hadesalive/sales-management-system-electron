@@ -1736,29 +1736,36 @@ function createSQLiteDatabaseService() {
         const row = db.prepare('SELECT * FROM company_settings WHERE id = 1').get();
         if (row) {
           return {
-            id: row.id,
-            companyName: row.company_name,
-            address: row.address,
-            phone: row.phone,
-            email: row.email,
-            website: row.website,
-            taxId: row.tax_id,
-            currency: row.currency,
-            timezone: row.timezone,
-            dateFormat: row.date_format,
-            invoicePrefix: row.invoice_prefix,
-            invoiceNumber: row.invoice_number,
-            quotePrefix: row.quote_prefix,
-            quoteNumber: row.quote_number,
-            lowStockThreshold: row.low_stock_threshold,
-            autoBackup: row.auto_backup,
-            backupFrequency: row.backup_frequency,
-            theme: row.theme,
-            language: row.language,
-            notifications: row.notifications,
-            onboardingCompleted: Boolean(row.onboarding_completed),
-            createdAt: row.created_at,
-            updatedAt: row.updated_at
+            onboardingCompleted: Boolean(row.onboarding_completed || false),
+            autoSaveDrafts: true,
+            confirmBeforeDelete: true,
+            showAnimations: true,
+            lowStockAlerts: true,
+            defaultPaymentMethod: 'cash',
+            invoiceNumberFormat: 'INV-{YYYY}-{MM}-{DD}-{####}',
+            receiptFooter: 'Thank you for your business!',
+            autoBackup: false,
+            backupFrequency: 'daily',
+            showProductImages: true,
+            defaultInvoiceStatus: 'draft',
+            receiptPaperSize: '80mm',
+            showTaxBreakdown: true,
+            requireCustomerInfo: false,
+            autoCalculateTax: true,
+            defaultDiscountPercent: 0,
+            showProfitMargin: false,
+            inventoryTracking: true,
+            barcodeScanning: false,
+            darkMode: false,
+            language: 'en',
+            dateFormat: 'MM/DD/YYYY',
+            timeFormat: '12h',
+            currencyPosition: 'before',
+            decimalPlaces: 2,
+            autoLogout: false,
+            sessionTimeout: 30,
+            printReceipts: true,
+            soundEffects: true
           };
         }
         return null;
@@ -1775,37 +1782,10 @@ function createSQLiteDatabaseService() {
         const updateFields = [];
         const updateValues = [];
 
-        // Map camelCase to snake_case for database
-        const fieldMapping = {
-          companyName: 'company_name',
-          address: 'address',
-          phone: 'phone',
-          email: 'email',
-          website: 'website',
-          taxId: 'tax_id',
-          currency: 'currency',
-          timezone: 'timezone',
-          dateFormat: 'date_format',
-          invoicePrefix: 'invoice_prefix',
-          invoiceNumber: 'invoice_number',
-          quotePrefix: 'quote_prefix',
-          quoteNumber: 'quote_number',
-          lowStockThreshold: 'low_stock_threshold',
-          autoBackup: 'auto_backup',
-          backupFrequency: 'backup_frequency',
-          theme: 'theme',
-          language: 'language',
-          notifications: 'notifications',
-          onboardingCompleted: 'onboarding_completed'
-        };
-
-        for (const [key, value] of Object.entries(updates)) {
-          if (fieldMapping[key] && value !== undefined) {
-            updateFields.push(`${fieldMapping[key]} = ?`);
-            // Convert boolean to integer for SQLite (0 or 1)
-            const sqlValue = typeof value === 'boolean' ? (value ? 1 : 0) : value;
-            updateValues.push(sqlValue);
-          }
+        // Only handle onboarding_completed since that's the only field that exists in the database
+        if (updates.onboardingCompleted !== undefined) {
+          updateFields.push('onboarding_completed = ?');
+          updateValues.push(updates.onboardingCompleted ? 1 : 0);
         }
 
         if (updateFields.length === 0) {
@@ -1813,10 +1793,9 @@ function createSQLiteDatabaseService() {
           return null;
         }
 
-        updateValues.push(new Date().toISOString()); // updated_at
         updateValues.push(1); // WHERE id = 1
 
-        const sql = `UPDATE company_settings SET ${updateFields.join(', ')}, updated_at = ? WHERE id = ?`;
+        const sql = `UPDATE company_settings SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
         console.log('SQLite: Executing preferences update:', sql);
         console.log('SQLite: With values:', updateValues);
         

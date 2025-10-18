@@ -3,10 +3,12 @@ import { Button, Toast } from '@/components/ui/core';
 import { InvoiceBuilder } from '@/components/ui/invoice';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { useSettings } from '@/contexts/SettingsContext';
 
 function NewInvoicePageContent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { preferences } = useSettings();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [, setIsPreviewMode] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,7 +114,7 @@ function NewInvoicePageContent() {
         tax: taxAmount,
         discount: discountAmount,
         total: total,
-        status: 'draft',
+        status: preferences.defaultInvoiceStatus || 'draft',
         invoiceType: 'invoice',
         currency: 'USD',
         dueDate: invoiceData.dueDate || '',
